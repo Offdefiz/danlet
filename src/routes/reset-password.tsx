@@ -1,0 +1,12 @@
+import { createFileRoute, useNavigate } from '@tanstack/react-router';
+import { useEffect, useState } from 'react';
+import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+export const Route = createFileRoute('/reset-password')({ head: () => ({ meta: [{ title: 'Definir senha — Duet de Daniel e Letícia' },{ name: 'description',content:'Recupere seu acesso privado ao Duet.' },{ property:'og:title',content:'Definir senha — Duet' },{ property:'og:description',content:'Acesso privado ao espaço de Daniel e Letícia.' },{ property:'og:type',content:'website' },{ name:'twitter:card',content:'summary' }] }), component: ResetPassword });
+function ResetPassword() {
+  const [recovery,setRecovery] = useState(false); const [password,setPassword] = useState(''); const [message,setMessage] = useState(''); const [busy,setBusy] = useState(false); const navigate = useNavigate();
+  useEffect(() => { const params = new URLSearchParams(window.location.hash.slice(1)); setRecovery(params.get('type') === 'recovery' || params.get('type') === 'invite'); }, []);
+  async function submit(e: React.FormEvent) { e.preventDefault(); setBusy(true); const { error } = await supabase.auth.updateUser({ password }); setBusy(false); if (error) setMessage(error.message); else { setMessage('Senha salva.'); await navigate({ to:'/',replace:true }); } }
+  return <main className="mx-auto flex min-h-screen max-w-sm flex-col justify-center gap-5 px-6"><h1 className="text-3xl font-semibold">Uma nova senha. ♡</h1>{recovery ? <form onSubmit={submit} className="space-y-5"><label className="block text-sm">Nova senha<Input type="password" required minLength={8} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className="mt-2"/></label><Button disabled={busy} className="w-full">{busy ? 'Salvando…' : 'Salvar senha'}</Button></form> : <p className="text-sm text-muted-foreground">Abra o link de recuperação recebido por e-mail para definir sua senha.</p>}{message && <p role="status">{message}</p>}<Button variant="link" onClick={() => navigate({ to:'/' })}>Voltar ao Duet</Button></main>;
+}
