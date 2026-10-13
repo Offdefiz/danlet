@@ -3,8 +3,9 @@ import { useState } from "react";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import confetti from "canvas-confetti";
 import { toast } from "sonner";
-import { ArrowRight, Check, CheckCheck, ChevronRight, Clock3, Compass, Heart, Home, Map, Sparkles, Target, X } from "lucide-react";
+import { ArrowRight, ArrowUpRight, Check, CheckCheck, ChevronRight, Clock3, Compass, Heart, Home, Instagram, Map, MapPin, Mountain, Palmtree, Sparkles, Target, Waves, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from "@/components/ui/sheet";
 import weddingImage from "@/assets/beach-wedding.jpg";
 import argentinaImage from "@/assets/argentina.jpg";
 import thailandImage from "@/assets/thailand.jpg";
@@ -51,6 +52,44 @@ const dreams = [
   { id: 104, title: "Casamento na praia", description: "Uma celebração íntima, o mar de testemunha e a vida inteira pela frente.", category: "NÓS DOIS", image: weddingImage, period: "Médio Prazo" as Period, match: true },
 ];
 
+type Venue = { name: string; place: string; vibe: string; handle: string; url: string };
+type VenueGroup = { id: string; label: string; region: string; icon: typeof Waves; venues: Venue[] };
+
+const venueGroups: VenueGroup[] = [
+  {
+    id: "lago",
+    label: "Lago",
+    region: "Capitólio — MG",
+    icon: Waves,
+    venues: [
+      { name: "Obbá Coema Village Hotel", place: "Capitólio — MG", vibe: "Infraestrutura de hotel com área verde à beira do lago.", handle: "@obbacoema", url: "https://www.instagram.com/obbacoema/" },
+      { name: "Balneário do Lago Hotel", place: "Capitólio — MG", vibe: "Estrutura de resort com gramados de frente para a água.", handle: "@balneariodolagohotel", url: "https://www.instagram.com/balneariodolagohotel/" },
+    ],
+  },
+  {
+    id: "montanha",
+    label: "Montanha e Campo",
+    region: "Serra Mineira",
+    icon: Mountain,
+    venues: [
+      { name: "Brisa da Serra Pousada Boutique", place: "Tiradentes — MG", vibe: "Jardins impecáveis, perfeitos para a estética English Garden.", handle: "@brisadaserra", url: "https://www.instagram.com/brisadaserra/" },
+      { name: "Villa Paolucci", place: "Tiradentes — MG", vibe: "Fazenda colonial com gramados e árvores centenárias.", handle: "@villapaolucci", url: "https://www.instagram.com/villapaolucci/" },
+      { name: "Vila Relicário", place: "Ouro Preto — MG", vibe: "Arquitetura clássica e neblina matinal que remetem ao campo inglês.", handle: "@vilarelicario", url: "https://www.instagram.com/vilarelicario/" },
+    ],
+  },
+  {
+    id: "litoral",
+    label: "Praia e Litoral",
+    region: "Espírito Santo",
+    icon: Palmtree,
+    venues: [
+      { name: "Ninho da Roxinha", place: "Serra — ES", vibe: "Gramado enorme e varanda rústica com vista panorâmica para o mar.", handle: "@ninhodaroxinha", url: "https://www.instagram.com/ninhodaroxinha/" },
+      { name: "Casa Bella Cerimonial", place: "Guarapari — ES", vibe: "Estrutura completa com buffet próprio (ótimo para reduzir custos).", handle: "@casabellacerimonial", url: "https://www.instagram.com/casabellacerimonial/" },
+      { name: "Cerimonial Oásis", place: "Vitória — ES", vibe: "Focado em cerimônias ao ar livre de frente para o mar, com estrutura de salão.", handle: "@cerimonialoasis", url: "https://www.instagram.com/cerimonialoasis/" },
+    ],
+  },
+];
+
 const periods: Period[] = ["Curto Prazo", "Médio Prazo", "Longo Prazo"];
 const navItems: { id: Tab; label: string; icon: typeof Home }[] = [
   { id: "dashboard", label: "Dashboard", icon: Home },
@@ -65,6 +104,7 @@ function DuetApp() {
   const [goals, setGoals] = useState(initialGoals);
   const [dreamIndex, setDreamIndex] = useState(0);
   const [direction, setDirection] = useState(1);
+  const [venuesOpen, setVenuesOpen] = useState(false);
   const reduceMotion = useReducedMotion();
   const currentDream = dreams[dreamIndex];
   const daysToWedding = Math.max(0, Math.ceil((new Date("2029-02-01T12:00:00").getTime() - Date.now()) / 86400000));
@@ -110,7 +150,7 @@ function DuetApp() {
       </header>
 
       <main className="app-shell pt-7 sm:pt-10" aria-live="polite">
-        {tab === "dashboard" && <Dashboard tasks={tasks} onTaskToggle={(id) => setTasks((current) => current.map((task) => task.id === id ? { ...task, done: !task.done } : task))} onNavigate={setTab} daysToWedding={daysToWedding} />}
+        {tab === "dashboard" && <Dashboard tasks={tasks} onTaskToggle={(id) => setTasks((current) => current.map((task) => task.id === id ? { ...task, done: !task.done } : task))} onNavigate={setTab} daysToWedding={daysToWedding} onOpenVenues={() => setVenuesOpen(true)} />}
         {tab === "dream" && <DreamMatch dream={currentDream} index={dreamIndex} direction={direction} onRespond={respondToDream} onRestart={() => setDreamIndex(0)} reducedMotion={Boolean(reduceMotion)} />}
         {tab === "matrix" && <Matrix goals={goals} period={period} onPeriodChange={setPeriod} onApprove={approveGoal} />}
       </main>
@@ -122,6 +162,8 @@ function DuetApp() {
           </Button>
         ))}
       </nav>
+
+      <VenuesSheet open={venuesOpen} onOpenChange={setVenuesOpen} />
     </div>
   );
 }
@@ -130,7 +172,7 @@ function SectionHeading({ eyebrow, title, action }: { eyebrow: string; title: st
   return <div className="mb-5 flex items-end justify-between gap-3"><div><p className="mb-2 text-[11px] font-bold uppercase tracking-[0.18em] text-primary">{eyebrow}</p><h2 className="text-xl font-bold sm:text-2xl">{title}</h2></div>{action}</div>;
 }
 
-function Dashboard({ tasks, onTaskToggle, onNavigate, daysToWedding }: { tasks: typeof initialTasks; onTaskToggle: (id: number) => void; onNavigate: (tab: Tab) => void; daysToWedding: number }) {
+function Dashboard({ tasks, onTaskToggle, onNavigate, daysToWedding, onOpenVenues }: { tasks: typeof initialTasks; onTaskToggle: (id: number) => void; onNavigate: (tab: Tab) => void; daysToWedding: number; onOpenVenues: () => void }) {
   return <div className="space-y-8 sm:space-y-10">
     <div><p className="mb-1 text-sm text-muted-foreground">O nosso espaço, no nosso tempo ✦</p><h1 className="text-3xl font-bold sm:text-4xl">Olá, casal! <span className="text-primary">♡</span></h1></div>
 
@@ -158,6 +200,21 @@ function Dashboard({ tasks, onTaskToggle, onNavigate, daysToWedding }: { tasks: 
       </section>
       <section><SectionHeading eyebrow="PRÓXIMA DESCOBERTA" title="E se a gente..." /><div className="glass-panel flex h-[195px] flex-col justify-between rounded-2xl p-5 sm:p-6"><div><span className="flex size-9 items-center justify-center rounded-xl bg-primary/15 text-primary"><Compass size={19} /></span><p className="mt-4 text-sm leading-relaxed text-muted-foreground">Tem ideias esperando por um sim de vocês dois.</p></div><Button variant="gold" onClick={() => onNavigate("dream")} className="h-10 w-fit rounded-xl px-4">Descobrir ideias <ArrowRight size={16} /></Button></div></section>
     </div>
+
+    <section>
+      <SectionHeading eyebrow="O GRANDE DIA" title="Locais para o casamento" />
+      <div className="glass-panel flex flex-col gap-5 rounded-2xl p-5 sm:flex-row sm:items-center sm:justify-between sm:p-7">
+        <div className="flex items-start gap-4">
+          <span className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary"><MapPin size={19} /></span>
+          <div className="min-w-0">
+            <h3 className="text-base font-bold sm:text-lg">8 locais selecionados a dois</h3>
+            <p className="mt-1 text-sm leading-relaxed text-muted-foreground">Do lago de Capitólio ao litoral do Espírito Santo — com a estética English Garden em mente.</p>
+            <div className="mt-3 flex flex-wrap gap-2">{venueGroups.map(({ id, label, icon: GroupIcon }) => <span key={id} className="flex items-center gap-1.5 rounded-full bg-secondary/80 px-3 py-1.5 text-[11px] font-semibold text-foreground/80"><GroupIcon size={12} className="text-primary" /> {label}</span>)}</div>
+          </div>
+        </div>
+        <Button variant="gold" onClick={onOpenVenues} className="h-10 w-fit shrink-0 self-end rounded-xl px-4 sm:self-auto">Ver locais <ArrowRight size={16} /></Button>
+      </div>
+    </section>
   </div>;
 }
 
@@ -177,4 +234,35 @@ function Matrix({ goals, period, onPeriodChange, onApprove }: { goals: Goal[]; p
     <div className="mb-4 flex items-center justify-between"><span className="text-xs font-semibold uppercase tracking-[0.13em] text-muted-foreground">{filtered.length} {filtered.length === 1 ? "META" : "METAS"} NO HORIZONTE</span><span className="text-xs text-muted-foreground">{period === "Curto Prazo" ? "Até 2027" : period === "Médio Prazo" ? "2028 — 2031" : "2032 em diante"}</span></div>
     <div className="grid gap-3 sm:grid-cols-2">{filtered.map((goal, index) => <motion.article key={goal.id} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: index * 0.05 }} className="glass-panel flex min-h-[213px] flex-col justify-between rounded-2xl p-5 sm:p-6"><div><div className="mb-4 flex items-start justify-between"><span className="rounded-md bg-primary/10 px-2.5 py-1.5 text-[10px] font-bold tracking-[0.13em] text-primary">{goal.category}</span><span className={`flex size-8 items-center justify-center rounded-full ${goal.approvals === 2 ? "bg-success/15 text-success" : "bg-secondary text-muted-foreground"}`}>{goal.approvals === 2 ? <CheckCheck size={17} /> : <Target size={16} />}</span></div><h2 className="text-lg font-bold">{goal.title}</h2><p className="mt-2 text-sm leading-relaxed text-muted-foreground">{goal.description}</p></div><div className="mt-5 border-t border-border pt-4"><Button type="button" onClick={() => onApprove(goal.id)} disabled={goal.approvals === 2} variant={goal.approvals === 0 ? "glass" : goal.approvals === 1 ? "gold" : "success"} className="h-10 w-full rounded-xl text-xs font-semibold sm:text-sm">{goal.approvals === 2 ? <><CheckCheck size={17} /> Meta concluída!</> : goal.approvals === 1 ? <><Check size={16} /> Aguardando parceiro · confirmar</> : <><Check size={16} /> Assinar esta meta</>}</Button><p className="mt-2 text-center text-[11px] text-muted-foreground">{goal.approvals === 0 ? "0 de 2 assinaturas" : goal.approvals === 1 ? "1 de 2 assinaturas" : "2 de 2 assinaturas"}</p></div></motion.article>)}</div>
   </div>;
+}
+
+function VenuesSheet({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+  return <Sheet open={open} onOpenChange={onOpenChange}>
+    <SheetContent side="right" className="flex w-full flex-col gap-0 overflow-hidden border-border bg-card p-0 sm:max-w-[480px]">
+      <SheetHeader className="border-b border-border p-5 text-left sm:p-6">
+        <SheetTitle className="flex items-center gap-2 text-lg font-bold"><MapPin size={18} className="text-primary" /> Locais para o casamento</SheetTitle>
+        <SheetDescription className="text-sm text-muted-foreground">Favoritos do casal, organizados por cenário.</SheetDescription>
+      </SheetHeader>
+      <div className="flex-1 space-y-7 overflow-y-auto p-5 sm:p-6">
+        {venueGroups.map(({ id, label, region, icon: GroupIcon, venues }) => (
+          <section key={id}>
+            <div className="mb-3 flex items-center gap-2.5">
+              <span className="flex size-8 items-center justify-center rounded-lg bg-primary/15 text-primary"><GroupIcon size={15} /></span>
+              <div><h3 className="text-xs font-bold uppercase tracking-[0.13em]">{label}</h3><p className="text-[11px] text-muted-foreground">{region}</p></div>
+            </div>
+            <div className="space-y-2.5">{venues.map((venue) => (
+              <article key={venue.name} className="glass-panel rounded-2xl p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0"><h4 className="text-sm font-bold leading-snug">{venue.name}</h4><p className="mt-0.5 text-[11px] text-muted-foreground">{venue.place}</p></div>
+                  <a href={venue.url} target="_blank" rel="noreferrer" className="flex shrink-0 items-center gap-1 rounded-full border border-primary/30 bg-primary/10 px-2.5 py-1 text-[10px] font-bold text-primary transition-colors hover:bg-primary/20"><Instagram size={11} /> {venue.handle}</a>
+                </div>
+                <p className="mt-2 text-xs leading-relaxed text-muted-foreground">{venue.vibe}</p>
+              </article>
+            ))}</div>
+          </section>
+        ))}
+        <p className="flex items-center gap-1.5 text-[11px] text-muted-foreground"><ArrowUpRight size={12} className="shrink-0" /> Toque no @ de cada local para ver fotos no Instagram.</p>
+      </div>
+    </SheetContent>
+  </Sheet>;
 }
