@@ -14,13 +14,259 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      activity: {
+        Row: {
+          action: string
+          actor_id: string | null
+          created_at: string
+          entity_id: string
+          entity_type: string
+          id: string
+          snapshot: Json
+        }
+        Insert: {
+          action: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id: string
+          entity_type: string
+          id?: string
+          snapshot: Json
+        }
+        Update: {
+          action?: string
+          actor_id?: string | null
+          created_at?: string
+          entity_id?: string
+          entity_type?: string
+          id?: string
+          snapshot?: Json
+        }
+        Relationships: []
+      }
+      couple_members: {
+        Row: {
+          person: string
+          user_id: string
+        }
+        Insert: {
+          person: string
+          user_id: string
+        }
+        Update: {
+          person?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "couple_members_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: true
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      profiles: {
+        Row: {
+          created_at: string
+          display_name: string
+          id: string
+        }
+        Insert: {
+          created_at?: string
+          display_name?: string
+          id: string
+        }
+        Update: {
+          created_at?: string
+          display_name?: string
+          id?: string
+        }
+        Relationships: []
+      }
+      records: {
+        Row: {
+          body: string
+          created_at: string
+          created_by: string | null
+          done: boolean
+          id: string
+          kind: string
+          period: string
+          reference_id: string | null
+          title: string
+          updated_at: string
+          updated_by: string | null
+          version: number
+        }
+        Insert: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          id?: string
+          kind: string
+          period?: string
+          reference_id?: string | null
+          title: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Update: {
+          body?: string
+          created_at?: string
+          created_by?: string | null
+          done?: boolean
+          id?: string
+          kind?: string
+          period?: string
+          reference_id?: string | null
+          title?: string
+          updated_at?: string
+          updated_by?: string | null
+          version?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "records_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "references_catalog"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      references_catalog: {
+        Row: {
+          category: string
+          checked_at: string
+          city: string
+          created_at: string
+          created_by: string | null
+          description: string
+          id: string
+          image_credit: string | null
+          image_path: string | null
+          instagram_url: string | null
+          scenery: string
+          source_url: string
+          state: string
+          title: string
+          verification: string
+        }
+        Insert: {
+          category?: string
+          checked_at?: string
+          city?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_credit?: string | null
+          image_path?: string | null
+          instagram_url?: string | null
+          scenery?: string
+          source_url: string
+          state?: string
+          title: string
+          verification?: string
+        }
+        Update: {
+          category?: string
+          checked_at?: string
+          city?: string
+          created_at?: string
+          created_by?: string | null
+          description?: string
+          id?: string
+          image_credit?: string | null
+          image_path?: string | null
+          instagram_url?: string | null
+          scenery?: string
+          source_url?: string
+          state?: string
+          title?: string
+          verification?: string
+        }
+        Relationships: []
+      }
+      signatures: {
+        Row: {
+          created_at: string
+          record_id: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          record_id: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          record_id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "signatures_record_id_fkey"
+            columns: ["record_id"]
+            isOneToOne: false
+            referencedRelation: "records"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "signatures_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      votes: {
+        Row: {
+          liked: boolean
+          reference_id: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          liked: boolean
+          reference_id: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          liked?: boolean
+          reference_id?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "votes_reference_id_fkey"
+            columns: ["reference_id"]
+            isOneToOne: false
+            referencedRelation: "references_catalog"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "votes_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      is_duet_member: { Args: never; Returns: boolean }
     }
     Enums: {
       [_ in never]: never
