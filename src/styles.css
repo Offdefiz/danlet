@@ -40,34 +40,34 @@
 }
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
   --radius: 1rem;
-  --background: oklch(0.205 0.04 262);
-  --foreground: oklch(0.97 0.01 85);
-  --card: oklch(0.25 0.042 260 / 82%);
-  --card-foreground: oklch(0.97 0.01 85);
-  --popover: oklch(0.25 0.04 260);
-  --popover-foreground: oklch(0.97 0.01 85);
-  --primary: oklch(0.79 0.13 82);
-  --primary-foreground: oklch(0.19 0.034 262);
-  --secondary: oklch(0.31 0.044 258);
-  --secondary-foreground: oklch(0.95 0.008 85);
-  --muted: oklch(0.29 0.035 260);
-  --muted-foreground: oklch(0.7 0.02 252);
-  --accent: oklch(0.36 0.046 256);
-  --accent-foreground: oklch(0.97 0.01 85);
-  --destructive: oklch(0.66 0.18 25);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.98 0 0 / 11%);
-  --input: oklch(0.98 0 0 / 16%);
-  --ring: oklch(0.79 0.13 82);
-  --success: oklch(0.69 0.15 159);
-  --success-foreground: oklch(0.16 0.04 170);
-  --danger: oklch(0.72 0.17 25);
-  --warning: oklch(0.76 0.16 57);
-  --warning-foreground: oklch(0.20 0.04 57);
-  --subtle: oklch(0.55 0.022 252);
-  --glow-gold: oklch(0.79 0.13 82 / 15%);
+  --background: oklch(0.985 0.004 20);
+  --foreground: oklch(0.3 0.03 20);
+  --card: oklch(1 0 0 / 85%);
+  --card-foreground: oklch(0.3 0.03 20);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.3 0.03 20);
+  --primary: oklch(0.66 0.09 75);
+  --primary-foreground: oklch(0.99 0 0);
+  --secondary: oklch(0.93 0.035 0);
+  --secondary-foreground: oklch(0.35 0.05 0);
+  --muted: oklch(0.96 0.012 10);
+  --muted-foreground: oklch(0.5 0.025 20);
+  --accent: oklch(0.85 0.06 0);
+  --accent-foreground: oklch(0.3 0.04 0);
+  --destructive: oklch(0.58 0.17 25);
+  --destructive-foreground: oklch(0.99 0 0);
+  --border: oklch(0.3 0.03 20 / 12%);
+  --input: oklch(0.3 0.03 20 / 16%);
+  --ring: oklch(0.66 0.09 75);
+  --success: oklch(0.58 0.06 160);
+  --success-foreground: oklch(0.99 0 0);
+  --danger: oklch(0.6 0.16 20);
+  --warning: oklch(0.72 0.13 60);
+  --warning-foreground: oklch(0.25 0.04 60);
+  --subtle: oklch(0.62 0.02 20);
+  --glow-gold: oklch(0.85 0.06 0 / 30%);
 }
 
 @layer base {
