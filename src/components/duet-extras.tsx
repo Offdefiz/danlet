@@ -7,7 +7,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/integrations/supabase/client';
 import type { Row } from '@/lib/duet.types';
 
-export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'>; name: string; size?: number; onPick?: (f: File) => void }) {
+export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
   useEffect(() => { let a = true; setUrl(''); if (profile?.avatar_path) void supabase.storage.from('duet-photos').createSignedUrl(profile.avatar_path, 3600).then(({ data }) => { if (a) setUrl(data?.signedUrl ?? ''); }); return () => { a = false; }; }, [profile?.avatar_path]);
   const face = <span style={{ width: size, height: size }} className="relative flex shrink-0 items-center justify-center overflow-hidden rounded-full bg-secondary text-sm font-semibold text-primary">{url ? <img src={url} alt={name} className="h-full w-full object-cover"/> : name[0]}{onPick && <Camera size={11} className="absolute bottom-0 right-0 rounded-full bg-card"/>}</span>;
