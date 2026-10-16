@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react';
-import { MessageCircle, Send, Heart, House, ListChecks, Camera } from 'lucide-react';
+import { Bell, MessageCircle, Send, Heart, House, ListChecks, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
+import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
 
 export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
@@ -61,4 +62,9 @@ export function Tutorial({ userId }: { userId: string }) {
     <p className="text-sm leading-relaxed text-muted-foreground">{s.text}</p>
     <div className="flex items-center justify-between"><span className="text-xs text-muted-foreground">{i + 1} de {steps.length}</span><div className="flex gap-2"><Button variant="ghost" onClick={close}>Pular</Button><Button onClick={() => i < steps.length - 1 ? setI(i + 1) : close()}>{i < steps.length - 1 ? 'Próximo' : 'Começar ♡'}</Button></div></div>
   </DialogContent></Dialog>;
+}
+
+const pushMsg: Record<string, string> = { registered: 'Notificações ativadas! ♡', 'not-configured': 'Notificações ainda não configuradas.', unsupported: 'Este navegador não aceita notificações. No iPhone, adicione o Duet à Tela de Início.', 'open-in-new-tab': 'Abra o Duet numa aba própria para ativar.', denied: 'Permita notificações nas configurações do navegador.' };
+export function PushButton({ userId }: { userId: string }) {
+  return <Button variant="ghost" size="icon" title="Ativar notificações" aria-label="Ativar notificações" onClick={async () => { try { const s = await enablePush(userId); s === 'registered' ? toast.success(pushMsg[s]) : toast.error(pushMsg[s]); } catch { toast.error('Não foi possível ativar.'); } }}><Bell size={18}/></Button>;
 }

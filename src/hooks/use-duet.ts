@@ -1,6 +1,9 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
+import { notifyPartner } from '@/lib/duet.functions';
+
+const labels: Record<string, string> = { votes: 'avaliou uma referência no Dream Match', signatures: 'assinou uma meta', records: 'atualizou os planos de vocês' };
 
 export function useDuet(userId: string) {
   const cache = useQueryClient();
@@ -21,6 +24,8 @@ export function useDuet(userId: string) {
   useEffect(() => {
     const channel = supabase.channel(`duet-${userId}`);
     for (const table of ['records', 'references_catalog', 'votes', 'signatures', 'activity', 'messages']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void cache.invalidateQueries({ queryKey: ['duet', userId] }));
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, p => { const a = p.new as { actor_id: string; entity_type: string }; if (a.actor_id === userId && labels[a.entity_type]) void notifyPartner({ data: { body: labels[a.entity_type]! } }).catch(() => {}); });
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => { const m = p.new as { user_id: string; body: string }; if (m.user_id === userId) void notifyPartner({ data: { body: `💬 ${m.body.slice(0, 120)}` } }).catch(() => {}); });
     channel.subscribe(status => { if (status === 'SUBSCRIBED') void cache.invalidateQueries({ queryKey: ['duet', userId] }); });
     const reconnect = () => void cache.invalidateQueries({ queryKey: ['duet', userId] });
     window.addEventListener('online', reconnect);
