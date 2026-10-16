@@ -95,3 +95,16 @@ export const notifyPartner = createServerFn({ method: 'POST' })
     const { pushTo } = await import('@/lib/push.server');
     return { sent: await pushTo(others, `${me.person} no Duet ♡`, data.body) };
   });
+
+export const findMusic = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .inputValidator(z.object({ q: z.string().min(1).max(150) }))
+  .handler(async ({ data }) => {
+    const key = process.env['FIRECRAWL_API_KEY']; const auth = process.env['LOVABLE_API_KEY'];
+    if (!key || !auth) return { results: [], error: 'Pesquisa indisponível.' };
+    const r = await fetch('https://connector-gateway.lovable.dev/firecrawl/v2/search', { method: 'POST', headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${auth}`, 'X-Connection-Api-Key': key }, body: JSON.stringify({ query: `${data.q} site:youtube.com`, limit: 6 }) });
+    if (!r.ok) return { results: [], error: `Pesquisa indisponível (${r.status}).` };
+    const b = await r.json() as { data?: { web?: { title: string; url: string }[] } | { title: string; url: string }[] };
+    const items = Array.isArray(b.data) ? b.data : b.data?.web ?? [];
+    return { results: items.filter(i => /youtube\.com\/watch|youtu\.be\//.test(i.url)).map(i => ({ title: i.title.replace(/ - YouTube$/, ''), url: i.url })), error: null };
+  });
