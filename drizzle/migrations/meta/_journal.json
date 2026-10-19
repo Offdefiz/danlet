@@ -36,6 +36,20 @@
       "when": 1792116401526,
       "tag": "0004_music_kind",
       "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1792388604235,
+      "tag": "0005_partner_push_events",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1792388730970,
+      "tag": "0006_personal_color_theme",
+      "breakpoints": true
     }
   ]
 }

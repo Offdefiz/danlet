@@ -84,18 +84,6 @@ export const addFromInstagram = createServerFn({ method: 'POST' })
     return { title };
   });
 
-export const notifyPartner = createServerFn({ method: 'POST' })
-  .middleware([requireSupabaseAuth])
-  .inputValidator(z.object({ body: z.string().min(1).max(200) }))
-  .handler(async ({ data, context }) => {
-    const { data: members } = await context.supabase.from('couple_members').select('user_id, person');
-    const me = members?.find(m => m.user_id === context.userId);
-    if (!me) throw new Error('Acesso reservado a Daniel e Letícia.');
-    const others = (members ?? []).filter(m => m.user_id !== context.userId).map(m => m.user_id);
-    const { pushTo } = await import('@/lib/push.server');
-    return { sent: await pushTo(others, `${me.person} no Duet ♡`, data.body) };
-  });
-
 export const findMusic = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
   .inputValidator(z.object({ q: z.string().min(1).max(150) }))

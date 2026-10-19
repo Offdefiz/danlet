@@ -14,7 +14,7 @@ const config = {
 export type PushStatus = 'registered' | 'not-configured' | 'unsupported' | 'open-in-new-tab' | 'denied';
 
 export async function enablePush(userId: string): Promise<PushStatus> {
-  if (!config.apiKey || !config.projectId || !vapidKey || !config.messagingSenderId) return 'not-configured';
+  if (!config.apiKey || !config.projectId || !config.appId || !vapidKey || !config.messagingSenderId) return 'not-configured';
   if (!('Notification' in window) || !(await isSupported())) return 'unsupported';
   if (window.top !== window.self) return 'open-in-new-tab';
   const perm = Notification.permission === 'granted' ? 'granted' : await Notification.requestPermission();
@@ -23,6 +23,7 @@ export async function enablePush(userId: string): Promise<PushStatus> {
   const app = getApps()[0] ?? initializeApp(config);
   const token = await getToken(getMessaging(app), { vapidKey, serviceWorkerRegistration: reg });
   if (!token) return 'denied';
-  await supabase.from('push_tokens').upsert({ token, user_id: userId });
+  const { error } = await supabase.from('push_tokens').upsert({ token, user_id: userId });
+  if (error) throw new Error('Não foi possível salvar este aparelho para receber avisos.');
   return 'registered';
 }

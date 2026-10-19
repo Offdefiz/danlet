@@ -67,6 +67,21 @@ export type Database = {
           },
         ]
       }
+      duet_presence: {
+        Row: {
+          last_seen: string
+          user_id: string
+        }
+        Insert: {
+          last_seen: string
+          user_id: string
+        }
+        Update: {
+          last_seen?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       messages: {
         Row: {
           body: string
@@ -88,24 +103,84 @@ export type Database = {
         }
         Relationships: []
       }
+      notification_preferences: {
+        Row: {
+          additions: boolean
+          enabled: boolean
+          last_online_notice: string | null
+          online: boolean
+          online_cooldown_minutes: number
+          user_id: string
+        }
+        Insert: {
+          additions?: boolean
+          enabled?: boolean
+          last_online_notice?: string | null
+          online?: boolean
+          online_cooldown_minutes?: number
+          user_id: string
+        }
+        Update: {
+          additions?: boolean
+          enabled?: boolean
+          last_online_notice?: string | null
+          online?: boolean
+          online_cooldown_minutes?: number
+          user_id?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_path: string | null
+          color_theme: string
           created_at: string
           display_name: string
           id: string
         }
         Insert: {
           avatar_path?: string | null
+          color_theme?: string
           created_at?: string
           display_name?: string
           id: string
         }
         Update: {
           avatar_path?: string | null
+          color_theme?: string
           created_at?: string
           display_name?: string
           id?: string
+        }
+        Relationships: []
+      }
+      push_event_queue: {
+        Row: {
+          actor_id: string
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          processed_at: string | null
+          recipient_id: string
+        }
+        Insert: {
+          actor_id: string
+          body: string
+          created_at?: string
+          id?: string
+          kind: string
+          processed_at?: string | null
+          recipient_id: string
+        }
+        Update: {
+          actor_id?: string
+          body?: string
+          created_at?: string
+          id?: string
+          kind?: string
+          processed_at?: string | null
+          recipient_id?: string
         }
         Relationships: []
       }
@@ -308,6 +383,29 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      claim_duet_push_events: {
+        Args: never
+        Returns: {
+          actor_id: string
+          body: string
+          created_at: string
+          id: string
+          kind: string
+          processed_at: string | null
+          recipient_id: string
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "push_event_queue"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
+      enqueue_duet_push: {
+        Args: { actor: string; event_body: string; event_kind: string }
+        Returns: undefined
+      }
+      heartbeat_duet_push: { Args: { actor: string }; Returns: boolean }
       is_duet_member: { Args: never; Returns: boolean }
     }
     Enums: {
