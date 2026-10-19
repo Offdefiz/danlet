@@ -10,3 +10,5 @@
 <!-- LOVABLE:END -->
 
 - Keep the Duet experience as one state-driven index route with its three views and shared state; this preserves in-session selections while switching tabs.
+- Capture partner push events with database triggers and atomically claim a durable queue; authenticated foreground heartbeats plus a managed fallback schedule prevent missed additions and cross-tab duplicate sends.
+- Keep notification preferences per recipient and presence cooldowns server-enforced; client state must never authorize recipients or reset deduplication.
