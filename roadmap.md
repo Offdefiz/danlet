@@ -1,4 +1,5 @@
 # Duet pessoal
+- [ ] Avisos push de adições e presença online com preferências e deduplicação; validar fluxo autenticado.
 - [ ] Tema claro rosa e sálvia e remoção dos estados fictícios.
 - [ ] Contas privadas Daniel/Letícia e recuperação de acesso.
 - [ ] Dados compartilhados, sincronização, histórico e conflitos.
