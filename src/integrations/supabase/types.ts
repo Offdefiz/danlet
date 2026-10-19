@@ -133,18 +133,21 @@ export type Database = {
       profiles: {
         Row: {
           avatar_path: string | null
+          color_theme: string
           created_at: string
           display_name: string
           id: string
         }
         Insert: {
           avatar_path?: string | null
+          color_theme?: string
           created_at?: string
           display_name?: string
           id: string
         }
         Update: {
           avatar_path?: string | null
+          color_theme?: string
           created_at?: string
           display_name?: string
           id?: string
