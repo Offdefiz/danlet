@@ -1,4 +1,5 @@
 # Duet pessoal
+- [ ] Foto de perfil maior e escolha individual de tema de cores.
 - [ ] Avisos push de adições e presença online com preferências e deduplicação; validar fluxo autenticado.
 - [ ] Melhorar alertas sonoros no celular dentro dos limites do navegador.
 - [ ] Verificar envio de e-mails mais frequentes para eventos do casal; depende de domínio de envio configurado.
