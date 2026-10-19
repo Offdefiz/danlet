@@ -12,6 +12,7 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as ResetPasswordRouteImport } from './routes/reset-password'
 import { Route as ApiPublicJobsInspireRouteImport } from './routes/api/public/jobs/inspire'
+import { Route as ApiPublicJobsPartnerNotificationsRouteImport } from './routes/api/public/jobs/partner-notifications'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -28,35 +29,58 @@ const ApiPublicJobsInspireRoute = ApiPublicJobsInspireRouteImport.update({
   path: '/api/public/jobs/inspire',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicJobsPartnerNotificationsRoute =
+  ApiPublicJobsPartnerNotificationsRouteImport.update({
+    id: '/api/public/jobs/partner-notifications',
+    path: '/api/public/jobs/partner-notifications',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/reset-password': typeof ResetPasswordRoute
   '/api/public/jobs/inspire': typeof ApiPublicJobsInspireRoute
+  '/api/public/jobs/partner-notifications': typeof ApiPublicJobsPartnerNotificationsRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/reset-password': typeof ResetPasswordRoute
   '/api/public/jobs/inspire': typeof ApiPublicJobsInspireRoute
+  '/api/public/jobs/partner-notifications': typeof ApiPublicJobsPartnerNotificationsRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/reset-password': typeof ResetPasswordRoute
   '/api/public/jobs/inspire': typeof ApiPublicJobsInspireRoute
+  '/api/public/jobs/partner-notifications': typeof ApiPublicJobsPartnerNotificationsRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/reset-password' | '/api/public/jobs/inspire'
+  fullPaths:
+    | '/'
+    | '/reset-password'
+    | '/api/public/jobs/inspire'
+    | '/api/public/jobs/partner-notifications'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/reset-password' | '/api/public/jobs/inspire'
-  id: '__root__' | '/' | '/reset-password' | '/api/public/jobs/inspire'
+  to:
+    | '/'
+    | '/reset-password'
+    | '/api/public/jobs/inspire'
+    | '/api/public/jobs/partner-notifications'
+  id:
+    | '__root__'
+    | '/'
+    | '/reset-password'
+    | '/api/public/jobs/inspire'
+    | '/api/public/jobs/partner-notifications'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   ResetPasswordRoute: typeof ResetPasswordRoute
   ApiPublicJobsInspireRoute: typeof ApiPublicJobsInspireRoute
+  ApiPublicJobsPartnerNotificationsRoute: typeof ApiPublicJobsPartnerNotificationsRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -82,6 +106,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicJobsInspireRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/jobs/partner-notifications': {
+      id: '/api/public/jobs/partner-notifications'
+      path: '/api/public/jobs/partner-notifications'
+      fullPath: '/api/public/jobs/partner-notifications'
+      preLoaderRoute: typeof ApiPublicJobsPartnerNotificationsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -89,6 +120,8 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   ResetPasswordRoute: ResetPasswordRoute,
   ApiPublicJobsInspireRoute: ApiPublicJobsInspireRoute,
+  ApiPublicJobsPartnerNotificationsRoute:
+    ApiPublicJobsPartnerNotificationsRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

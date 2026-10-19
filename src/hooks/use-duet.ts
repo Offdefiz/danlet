@@ -1,12 +1,12 @@
 import { useEffect } from 'react';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
-import { notifyPartner } from '@/lib/duet.functions';
-
-const labels: Record<string, string> = { votes: 'avaliou uma referência no Dream Match', signatures: 'assinou uma meta', records: 'atualizou os planos de vocês' };
+import { syncPartnerNotifications } from '@/lib/notifications.functions';
 
 export function useDuet(userId: string) {
   const cache = useQueryClient();
+  const syncNotifications = useServerFn(syncPartnerNotifications);
   const query = useQuery({ queryKey: ['duet', userId], queryFn: async () => {
     const member = await supabase.from('couple_members').select('*');
     if (member.error) throw member.error;
@@ -24,12 +24,23 @@ export function useDuet(userId: string) {
   useEffect(() => {
     const channel = supabase.channel(`duet-${userId}`);
     for (const table of ['records', 'references_catalog', 'votes', 'signatures', 'activity', 'messages']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void cache.invalidateQueries({ queryKey: ['duet', userId] }));
-    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'activity' }, p => { const a = p.new as { actor_id: string; entity_type: string }; if (a.actor_id === userId && labels[a.entity_type]) void notifyPartner({ data: { body: labels[a.entity_type]! } }).catch(() => {}); });
-    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, p => { const m = p.new as { user_id: string; body: string }; if (m.user_id === userId) void notifyPartner({ data: { body: `💬 ${m.body.slice(0, 120)}` } }).catch(() => {}); });
+    const drain = () => { void syncNotifications({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error)); };
+    for (const table of ['records', 'references_catalog', 'messages', 'activity', 'profiles']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, drain);
     channel.subscribe(status => { if (status === 'SUBSCRIBED') void cache.invalidateQueries({ queryKey: ['duet', userId] }); });
     const reconnect = () => void cache.invalidateQueries({ queryKey: ['duet', userId] });
     window.addEventListener('online', reconnect);
     return () => { void supabase.removeChannel(channel); window.removeEventListener('online', reconnect); };
-  }, [cache, userId]);
+  }, [cache, userId, syncNotifications]);
+  useEffect(() => {
+    const heartbeat = () => {
+      if (document.visibilityState !== 'visible' || !navigator.onLine) return;
+      void syncNotifications({ data: { heartbeat: true } }).catch(error => console.warn('Presença não atualizada', error));
+    };
+    heartbeat();
+    const interval = window.setInterval(heartbeat, 30_000);
+    window.addEventListener('online', heartbeat);
+    document.addEventListener('visibilitychange', heartbeat);
+    return () => { window.clearInterval(interval); window.removeEventListener('online', heartbeat); document.removeEventListener('visibilitychange', heartbeat); };
+  }, [syncNotifications, userId]);
   return query;
 }

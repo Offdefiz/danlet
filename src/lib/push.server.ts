@@ -1,22 +1,26 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 
-export async function pushTo(userIds: string[] | null, title: string, body: string) {
+export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string) {
   const auth = process.env['LOVABLE_API_KEY'];
   const key = process.env['FIREBASE_MESSAGING_API_KEY'];
   if (!auth || !key) throw new Error('Notificações não configuradas.');
   let q = supabaseAdmin.from('push_tokens').select('token');
   if (userIds) q = q.in('user_id', userIds);
-  const { data } = await q;
+  const { data, error } = await q;
+  if (error) throw error;
   let sent = 0;
   for (const { token } of data ?? []) {
     const res = await fetch('https://connector-gateway.lovable.dev/firebase_messaging/v1/projects/_/messages:send', {
       method: 'POST',
       headers: { Authorization: `Bearer ${auth}`, 'X-Connection-Api-Key': key, 'Content-Type': 'application/json' },
-      body: JSON.stringify({ message: { token, notification: { title, body }, webpush: { fcm_options: { link: '/' } } } }),
+      body: JSON.stringify({ message: { token, notification: { title, body }, webpush: { fcm_options: { link: 'https://danlet.lovable.app/' }, ...(tag ? { notification: { tag, renotify: false } } : {}) } } }),
     });
     if (res.ok) sent++;
-    else if (res.status === 404 || res.status === 400) await supabaseAdmin.from('push_tokens').delete().eq('token', token);
-    else console.error(`FCM [${res.status}]: ${await res.text()}`);
+    else {
+      const text = await res.text();
+      console.error(`FCM [${res.status}]: ${text}`);
+      if (text.includes('UNREGISTERED') || (res.status === 400 && text.includes('registration token'))) await supabaseAdmin.from('push_tokens').delete().eq('token', token);
+    }
   }
   return sent;
 }
