@@ -1,5 +1,7 @@
 # Duet pessoal
 - [ ] Avisos push de adições e presença online com preferências e deduplicação; validar fluxo autenticado.
+- [ ] Melhorar alertas sonoros no celular dentro dos limites do navegador.
+- [ ] Verificar envio de e-mails mais frequentes para eventos do casal; depende de domínio de envio configurado.
 - [ ] Tema claro rosa e sálvia e remoção dos estados fictícios.
 - [ ] Contas privadas Daniel/Letícia e recuperação de acesso.
 - [ ] Dados compartilhados, sincronização, histórico e conflitos.
