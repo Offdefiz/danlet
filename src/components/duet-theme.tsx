@@ -12,8 +12,8 @@ export function ThemePicker({ userId, theme }: { userId: string; theme: string }
   const [busy, setBusy] = useState(false);
   const cache = useQueryClient();
   useEffect(() => {
-    document.documentElement.dataset.theme = theme;
-    return () => { delete document.documentElement.dataset.theme; };
+    document.documentElement.dataset['theme'] = theme;
+    return () => { delete document.documentElement.dataset['theme']; };
   }, [theme]);
   async function choose(value: string) {
     setBusy(true);
