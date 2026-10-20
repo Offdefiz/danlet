@@ -1,0 +1,59 @@
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
+
+const { successToast, errorToast } = vi.hoisted(() => ({
+  successToast: vi.fn(),
+  errorToast: vi.fn(),
+}));
+vi.mock('sonner', () => ({
+  toast: { success: successToast, error: errorToast },
+}));
+
+const daniel = '11111111-1111-4111-8111-111111111111';
+const leticia = '22222222-2222-4222-8222-222222222222';
+
+beforeEach(() => {
+  window.localStorage.clear();
+  successToast.mockReset();
+  errorToast.mockReset();
+});
+
+afterEach(() => {
+  cleanup();
+  delete document.documentElement.dataset['theme'];
+});
+
+describe('Personal themes stored on each device', () => {
+  it('preserves all nine available palettes', () => {
+    expect(themes).toHaveLength(9);
+  });
+
+  it('saves a palette in localStorage and restores it when reopened', async () => {
+    render(<ThemePicker userId={daniel} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
+    fireEvent.click(screen.getByRole('button', { name: /Escuro Elegante/i }));
+
+    await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark-elegant'));
+    expect(window.localStorage.getItem(`duet:personal-theme:${daniel}`)).toBe('dark-elegant');
+    expect(successToast).toHaveBeenCalledWith('Tema salvo neste aparelho.');
+    expect(errorToast).not.toHaveBeenCalled();
+
+    cleanup();
+    render(<ThemePicker userId={daniel} />);
+    await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark-elegant'));
+  });
+
+  it('keeps each account separate on a shared browser', () => {
+    window.localStorage.setItem(`duet:personal-theme:${daniel}`, 'earthy');
+    window.localStorage.setItem(`duet:personal-theme:${leticia}`, 'pastel-romantic');
+    expect(readPersonalTheme(daniel)).toBe('earthy');
+    expect(readPersonalTheme(leticia)).toBe('pastel-romantic');
+  });
+
+  it('ignores unknown or obsolete palette IDs', () => {
+    window.localStorage.setItem(`duet:personal-theme:${daniel}`, 'unrecognized');
+    expect(readPersonalTheme(daniel)).toBe('romance');
+  });
+});

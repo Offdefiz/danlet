@@ -3,8 +3,6 @@ import { Palette, Check } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
-import { supabase } from '@/integrations/supabase/client';
-import { useQueryClient } from '@tanstack/react-query';
 
 export const themes = [
   { id: 'clean-modern', label: 'Clean Modern', description: 'Claro e contemporâneo', colors: ['#FAF8F8', '#C97A8B', '#5C8C74'] },
@@ -18,32 +16,62 @@ export const themes = [
   { id: 'ocean', label: 'Oceano original', description: 'Azul relaxante', colors: ['#FAF8F8', '#427A99', '#D3E5EF'] },
 ] as const;
 
-export function ThemePicker({ userId, theme }: { userId: string; theme: string }) {
+type ThemeId = (typeof themes)[number]['id'];
+const DEFAULT_THEME: ThemeId = 'romance';
+const STORAGE_PREFIX = 'duet:personal-theme:';
+
+function isThemeId(value: string | null): value is ThemeId {
+  return themes.some((item) => item.id === value);
+}
+
+export function readPersonalTheme(userId: string): ThemeId {
+  if (typeof window === 'undefined') return DEFAULT_THEME;
+  try {
+    const saved = window.localStorage.getItem(`${STORAGE_PREFIX}${userId}`);
+    return isThemeId(saved) ? saved : DEFAULT_THEME;
+  } catch {
+    return DEFAULT_THEME;
+  }
+}
+
+function persistPersonalTheme(userId: string, value: ThemeId): boolean {
+  try {
+    window.localStorage.setItem(`${STORAGE_PREFIX}${userId}`, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+export function ThemePicker({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const cache = useQueryClient();
+  // Match the server-rendered default before loading device-only storage.
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
+
+  useEffect(() => {
+    setTheme(readPersonalTheme(userId));
+  }, [userId]);
+
   useEffect(() => {
     document.documentElement.dataset['theme'] = theme;
     return () => { delete document.documentElement.dataset['theme']; };
   }, [theme]);
-  async function choose(value: string) {
-    if (busy || value === theme) { setOpen(false); return; }
-    setBusy(true);
-    try {
-      const { error } = await supabase.from('profiles').update({ color_theme: value }).eq('id', userId);
-      if (error) throw error;
-      await cache.invalidateQueries({ queryKey: ['duet', userId] });
-      toast.success('Tema salvo para sua conta.');
-      setOpen(false);
-    } catch {
-      toast.error('Não foi possível salvar seu tema. Verifique se a migração do banco foi aplicada.');
-    } finally { setBusy(false); }
+
+  function choose(value: ThemeId) {
+    if (value === theme) { setOpen(false); return; }
+    setTheme(value);
+    if (persistPersonalTheme(userId, value)) {
+      toast.success('Tema salvo neste aparelho.');
+    } else {
+      toast.error('Tema aplicado, mas não foi possível salvar a preferência neste aparelho.');
+    }
+    setOpen(false);
   }
   return <><Button variant="ghost" size="icon" aria-label="Escolher cores do app" title="Cores do app" onClick={() => setOpen(true)}><Palette size={18}/></Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="max-h-[85dvh] overflow-y-auto sm:max-w-lg"><DialogHeader><DialogTitle>Minhas cores</DialogTitle></DialogHeader>
       <p className="text-sm text-muted-foreground">O tema é pessoal: sua escolha não muda as cores da outra pessoa.</p>
       <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">{themes.map(item =>
-        <button key={item.id} type="button" disabled={busy} aria-pressed={theme === item.id} onClick={() => void choose(item.id)}
+        <button key={item.id} type="button" aria-pressed={theme === item.id} onClick={() => void choose(item.id)}
           className="flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card p-3 text-left text-foreground transition-colors hover:bg-muted disabled:opacity-60">
           <span className="flex shrink-0 -space-x-2" aria-hidden="true">{item.colors.map((color, i) =>
             <span key={i} className="h-8 w-8 rounded-full border border-black/10" style={{ backgroundColor: color }}/>)}</span>
