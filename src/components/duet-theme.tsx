@@ -45,7 +45,8 @@ function persistPersonalTheme(userId: string, value: ThemeId): boolean {
 
 export function ThemePicker({ userId }: { userId: string }) {
   const [open, setOpen] = useState(false);
-  const [theme, setTheme] = useState<ThemeId>(() => readPersonalTheme(userId));
+  // Match the server-rendered default before loading device-only storage.
+  const [theme, setTheme] = useState<ThemeId>(DEFAULT_THEME);
 
   useEffect(() => {
     setTheme(readPersonalTheme(userId));
