@@ -59,10 +59,10 @@ export function ThemePicker({ userId, hideTrigger = false }: { userId: string; h
   }, [theme]);
 
   useEffect(() => {
-    const openFromMenu = () => setOpen(true);
+    const openFromMenu = () => { setSelected(theme); setOpen(true); };
     window.addEventListener('duet:open-theme', openFromMenu);
     return () => window.removeEventListener('duet:open-theme', openFromMenu);
-  }, []);
+  }, [theme]);
 
   const toggleOpen = (next: boolean) => {
     if (next) setSelected(theme);
