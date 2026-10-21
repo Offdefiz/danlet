@@ -23,6 +23,7 @@ export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'pr
 
 export function Chat({ userId, me, partner, messages, profiles }: { userId: string; me: string; partner: string; messages: Row<'messages'>[]; profiles: Row<'profiles'>[] }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => { const show = () => setOpen(true); window.addEventListener('duet:open-chat', show); return () => window.removeEventListener('duet:open-chat', show); }, []);
   const [online, setOnline] = useState(false);
   const [text, setText] = useState('');
   const [outgoing, setOutgoing] = useState<Array<{ id: string; body: string; user_id: string; created_at: string; status: 'sending' | 'sent' }>>([]);

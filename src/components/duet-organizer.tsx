@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Heart, House, ListChecks, Plus, X, Check, Instagram, ExternalLink, MapPin, Flower2, ArrowLeft, Search, LogOut, Pencil, Trash2, Camera, Clock, BookHeart, CheckCheck, UserRound } from 'lucide-react';
+import { Heart, House, ListChecks, Plus, X, Check, Instagram, ExternalLink, MapPin, Flower2, ArrowLeft, Search, LogOut, Pencil, Trash2, Camera, Clock, BookHeart, CheckCheck, UserRound, CalendarDays } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -17,6 +17,9 @@ import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker } from '@/components/duet-theme';
 import { DuetAccountMenu } from '@/components/duet-account-menu';
 import { rankReferences } from '@/lib/duet-recommendations';
+import { DuetNotificationCenter } from '@/components/duet-notification-center';
+import { DuetCalendar } from '@/components/duet-calendar';
+import { playDuetSound } from '@/lib/duet-sounds';
 
 type RecordForm = { id?: string; version?: number; kind: 'goal' | 'task' | 'note' | 'setting'; title: string; body: string; period: string; reference_id?: string | null; done?: boolean };
 type SearchItem = { title: string; description: string; source_url: string };
@@ -92,11 +95,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     setLocallyVoted(previous => new Set(previous).add(ref.id));
     const saved = await mutate(() => supabase.from('votes').upsert({ reference_id: ref.id, user_id: userId, liked, updated_at: new Date().toISOString() }));
     if (!saved) setLocallyVoted(previous => { const next = new Set(previous); next.delete(ref.id); return next; });
-    else if (liked && partnerVote(data?.votes ?? [], ref.id, userId)?.liked)
+    else if (liked && partnerVote(data?.votes ?? [], ref.id, userId)?.liked) {
+      playDuetSound('match', userId);
       toast.success(`Match! Você e ${partnerName} curtiram ${ref.title}. ♡`);
+    }
   }
   async function sign(record: Row<'records'>) {
-    if (await mutate(() => supabase.from('signatures').insert({ record_id: record.id, user_id: userId }))) toast.success('Sua assinatura foi salva.');
+    if (await mutate(() => supabase.from('signatures').insert({ record_id: record.id, user_id: userId }))) { playDuetSound('success', userId); toast.success('Sua assinatura foi salva.'); }
   }
   async function remove(record: Row<'records'>) {
     if (!window.confirm(`Excluir “${record.title}”?`)) return;
@@ -166,6 +171,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       <div className="flex items-center gap-1 sm:gap-2">
         <ThemePicker userId={userId} hideTrigger/>
         <PushButton userId={userId} hideTrigger/>
+        <DuetNotificationCenter userId={userId} activity={data.activity} messages={data.messages} members={data.members} onNavigate={target => { if (target === 'chat') window.dispatchEvent(new Event('duet:open-chat')); else setTab(target); }}/>
         <Chat userId={userId} me={me?.person ?? ''} partner={partnerName} messages={data.messages} profiles={data.profiles}/>
         <DuetAccountMenu name={me?.person ?? 'Nós'} profile={data.profiles.find(p => p.id === userId)} onProfile={() => setTab('profile')} onSignOut={() => void signOut()} online={online} sync={sync}/>
       </div>
@@ -185,6 +191,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         </div>}
       </section>}
       {history ? <><div className="mb-5 flex flex-wrap gap-2">{['Minhas escolhas','Escolhas do parceiro','Matches','Descartados'].map(f => <Button key={f} variant={historyFilter === f ? 'secondary' : 'ghost'} className="text-xs" onClick={() => setHistoryFilter(f)}>{f}</Button>)}</div><div className="space-y-3">{historyRefs.map(r => <article key={r.id} className="rounded-lg border border-border bg-card p-4"><h2 className="font-semibold">{r.title}</h2><p className="mt-2 text-xs text-muted-foreground">Você: {data.votes.find(v => v.reference_id === r.id && v.user_id === userId)?.liked === true ? 'curtiu' : data.votes.find(v => v.reference_id === r.id && v.user_id === userId)?.liked === false ? 'não curtiu' : 'ainda não avaliou'} · {partnerName}: {voteLabel(partnerVote(data.votes,r.id,userId))}</p><div className="mt-3 flex flex-wrap gap-2"><Button size="icon" variant="reject" title="Não curtir" disabled={busy} onClick={() => vote(r,false)}><X/></Button><Button size="icon" variant="success" title="Curtir" disabled={busy} onClick={() => vote(r,true)}><Heart/></Button><Button variant="outline" onClick={() => setDetail(r)}>Detalhes</Button>{isMatch(data.votes,r.id) && !goals.some(g => g.reference_id === r.id) && <Button disabled={busy} onClick={() => promote(r)}><Plus/>Levar aos planos</Button>}</div></article>)}{!historyRefs.length && <Empty text="Ainda não há escolhas neste filtro."/>}</div></> : current ? <><div className="mb-3 flex items-center justify-between text-xs text-muted-foreground"><span>{pending.length} {pending.length === 1 ? 'descoberta' : 'descobertas'} para você</span><span className="text-success">{partnerName}: {voteLabel(partnerVote(data.votes,current.id,userId))}</span></div><AnimatePresence mode="wait"><motion.article key={current.id} drag={busy ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.65} dragMomentum={false} onDragEnd={(_, info) => { if (Math.abs(info.offset.x) > 75) void vote(current,info.offset.x > 0); }} initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: swipeDirection === 'right' ? 160 : -160, rotate: swipeDirection === 'right' ? 8 : -8 }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} className="overflow-hidden rounded-lg border border-border bg-card"><ReferencePhoto reference={current}/><div className="p-5"><div className="flex items-center gap-2 text-[11px] font-medium text-success"><MapPin size={13}/>{[current.city,current.state].filter(Boolean).join(' · ') || current.scenery || current.category}</div><h2 className="mt-2 text-2xl font-semibold leading-tight">{current.title}</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">{current.description}</p><p className="mt-3 text-[10px] text-muted-foreground">{current.verification} · fonte consultada em {dateLabel(current.checked_at)}</p><div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => setDetail(current)}>Notas e detalhes</Button>{current.instagram_url && <Button asChild variant="ghost" size="sm"><a href={current.instagram_url} target="_blank" rel="noreferrer"><Instagram/>Instagram</a></Button>}<Button asChild variant="ghost" size="sm"><a href={current.source_url} target="_blank" rel="noreferrer"><ExternalLink/>Fonte</a></Button></div></div></motion.article></AnimatePresence><div className="mt-6 flex items-center justify-center gap-12"><div className="text-center"><Button variant="reject" size="circle" aria-label="Não curtir esta opção" disabled={busy} onClick={() => vote(current,false)}><X/></Button><p className="mt-2 text-xs text-muted-foreground">Não é para nós</p></div><div className="text-center"><Button variant="success" size="circle" aria-label="Curtir esta opção" disabled={busy} onClick={() => vote(current,true)}><Heart/></Button><p className="mt-2 text-xs text-muted-foreground">Eu gostei</p></div></div></> : <Empty text="As descobertas deste filtro acabaram. Nossas escolhas continuam no histórico." action="Buscar novas opções" onClick={() => setSearchOpen(true)}/>}</div>}
+    {tab === 'calendar' && <DuetCalendar userId={userId} records={data.records} onSaved={() => cache.invalidateQueries({ queryKey: ['duet', userId] })}/>}
     {tab === 'list' && <section className="mx-auto max-w-2xl space-y-6"><h1 className="text-3xl font-semibold">Nossa lista</h1><p className="text-sm text-muted-foreground">Tarefas e anotações do casal, num só lugar.</p><Section title="Tarefas" action={<Button size="icon" variant="outline" aria-label="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Ainda não há tarefas." action="Adicionar tarefa" onClick={() => newRecord('task')}/>}<Section title="Anotações" action={<Button size="icon" variant="outline" aria-label="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Ainda não há anotações." action="Adicionar anotação" onClick={() => newRecord('note')}/>}</section>}
     {tab === 'profile' && <section className="mx-auto max-w-xl space-y-5">
       <h1 className="text-3xl font-semibold">Meu perfil</h1>
@@ -222,12 +229,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   </main><nav aria-label="Navegação principal" className="fixed bottom-0 left-0 z-40 w-full border-t border-border bg-popover/95 pb-[env(safe-area-inset-bottom)] shadow-lg backdrop-blur-xl"><div className="mx-auto flex max-w-md items-center justify-between px-2 py-2">
     {([{ id: 'home', label: 'Início', icon: House }, { id: 'dream', label: 'Dream', icon: Heart }] as const).map(n => <Button key={n.id} variant="ghost" aria-current={tab === n.id ? 'page' : undefined} onClick={() => setTab(n.id)} className={`h-14 min-w-0 flex-1 flex-col gap-1 text-[10px] ${tab === n.id ? 'text-primary' : 'text-muted-foreground'}`}><n.icon size={19}/>{n.label}</Button>)}
     <Button aria-label="Adicionar" title="Adicionar" onClick={() => setQuickAddOpen(true)} className="mx-1 h-14 w-14 shrink-0 rounded-full bg-primary text-primary-foreground shadow-md hover:bg-primary/90"><Plus size={27}/></Button>
-    {([{ id: 'plans', label: 'Planos', icon: ListChecks }, { id: 'list', label: 'Lista', icon: BookHeart }] as const).map(n => <Button key={n.id} variant="ghost" aria-current={tab === n.id ? 'page' : undefined} onClick={() => setTab(n.id)} className={`h-14 min-w-0 flex-1 flex-col gap-1 text-[10px] ${tab === n.id ? 'text-primary' : 'text-muted-foreground'}`}><n.icon size={19}/>{n.label}</Button>)}
+    {([{ id: 'calendar', label: 'Agenda', icon: CalendarDays }, { id: 'plans', label: 'Planos', icon: ListChecks }, { id: 'list', label: 'Lista', icon: BookHeart }] as const).map(n => <Button key={n.id} variant="ghost" aria-current={tab === n.id ? 'page' : undefined} onClick={() => setTab(n.id)} className={`h-14 min-w-0 flex-1 flex-col gap-1 text-[10px] ${tab === n.id ? 'text-primary' : 'text-muted-foreground'}`}><n.icon size={19}/>{n.label}</Button>)}
     </div></nav>
   <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}><DialogContent>
     <DialogHeader><DialogTitle>Adicionar ao nosso espaço</DialogTitle></DialogHeader>
     <div className="grid gap-2">
       {([{ label: 'Próximo passo', kind: 'task' }, { label: 'Anotação', kind: 'note' }, { label: 'Meta do casal', kind: 'goal' }] as const).map(item => <Button key={item.kind} variant="outline" onClick={() => { setQuickAddOpen(false); newRecord(item.kind); }}><Plus size={16}/>{item.label}</Button>)}
+      <Button variant="outline" onClick={() => { setQuickAddOpen(false); setTab('calendar'); }}><CalendarDays size={16}/>Compromisso na agenda</Button>
       <Button variant="outline" onClick={() => { setQuickAddOpen(false); setCategory('Locais'); setTab('dream'); setAddReference(true); }}><MapPin size={16}/>Local ou referência de casamento</Button>
     </div>
   </DialogContent></Dialog>
