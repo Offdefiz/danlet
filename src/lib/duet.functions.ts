@@ -90,4 +90,4 @@ export const findMusic = createServerFn({ method: 'POST' })
     } catch {
       return { results: [], error: 'Pesquisa de músicas indisponível agora. Tente novamente.' };
     } finally { clearTimeout(timer); }
-  };
+  });
