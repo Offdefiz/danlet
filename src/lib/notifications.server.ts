@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { pushTo } from '@/lib/push.server';
+import { formatPartnerPush } from '@/lib/push-copy';
 
 export async function drainPartnerPush() {
   const { data: events, error } = await supabaseAdmin.rpc('claim_duet_push_events');
@@ -10,9 +11,12 @@ export async function drainPartnerPush() {
   for (const event of events ?? []) {
     const name = members?.find(m => m.user_id === event.actor_id)?.person;
     if (!name) continue;
-    // Claims are durable and at-most-once, even across tabs and scheduler overlap.
-    try { sent += await pushTo([event.recipient_id], `${name} no Duet ♡`, `${name} ${event.body}`, event.kind === 'online' ? `online-${event.actor_id}` : event.id); }
-    catch (error) { console.error('Falha ao enviar aviso do casal', error); }
+    const notification = formatPartnerPush(name, event.kind, event.body);
+    try {
+      sent += await pushTo([event.recipient_id], notification.title, notification.body, event.kind === 'online' ? `online-${event.actor_id}` : event.id);
+    } catch (error) {
+      console.error('Falha ao enviar aviso do casal', error);
+    }
   }
   return sent;
 }
