@@ -6,6 +6,11 @@ const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDE
 const APP_ICON = new URL('icons/duet-192.png', APP_URL).href;
 const APP_BADGE = new URL('icons/duet-badge.png', APP_URL).href;
 export { firebasePushConfigured };
+export async function assertFirebasePushReady(): Promise<void> {
+  const config = firebaseCredentials();
+  if (!firebasePushConfigured() || !config) throw new Error('Firebase push não configurado.');
+  await firebaseAccessToken(config);
+}
 
 export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string) {
   const creds = firebaseCredentials();
@@ -42,6 +47,9 @@ export async function pushTo(userIds: string[] | null, title: string, body: stri
     });
     if (response.ok) { sent++; continue; }
     const text = await response.text();
+    if (response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500) {
+      throw new Error('Falha temporária no envio Firebase (HTTP ' + response.status + ').');
+    }
     // Don't log credentials, individual messages or sensitive device tokens.
     console.warn('[FCM] Push rejected: HTTP ' + response.status);
     if (text.includes('UNREGISTERED') || text.includes('registration-token-not-registered')) {
