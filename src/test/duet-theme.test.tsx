@@ -26,8 +26,9 @@ afterEach(() => {
 });
 
 describe('Personal themes stored on each device', () => {
-  it('preserves all nine available palettes', () => {
-    expect(themes).toHaveLength(9);
+  it('preserves all nine palettes and adds pink glitter', () => {
+    expect(themes).toHaveLength(10);
+    expect(themes.find(t => t.id === 'pink-glitter')?.label).toMatch(/Glitter/);
   });
 
   it('saves a palette in localStorage and restores it when reopened', async () => {
@@ -35,6 +36,11 @@ describe('Personal themes stored on each device', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
     fireEvent.click(screen.getByRole('button', { name: /Escuro Elegante/i }));
 
+    // Selection is staged: colors must change only after confirmation.
+    expect(document.documentElement.dataset['theme']).toBe('romance');
+    expect(window.localStorage.getItem(`duet:personal-theme:${daniel}`)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar tema' }));
+    // Confirming immediately updates the active page, without a reload.
     await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark-elegant'));
     expect(window.localStorage.getItem(`duet:personal-theme:${daniel}`)).toBe('dark-elegant');
     expect(successToast).toHaveBeenCalledWith('Tema salvo neste aparelho.');
@@ -43,6 +49,16 @@ describe('Personal themes stored on each device', () => {
     cleanup();
     render(<ThemePicker userId={daniel} />);
     await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark-elegant'));
+  });
+
+  it('discards an unconfirmed palette when the picker is closed', async () => {
+    render(<ThemePicker userId={daniel} />);
+    await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('romance'));
+    fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
+    fireEvent.click(screen.getByRole('button', { name: /Natureza e tons terrosos/i }));
+    fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }));
+    expect(document.documentElement.dataset['theme']).toBe('romance');
+    expect(window.localStorage.getItem(`duet:personal-theme:${daniel}`)).toBeNull();
   });
 
   it('keeps each account separate on a shared browser', () => {

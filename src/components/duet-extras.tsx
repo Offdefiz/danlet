@@ -1,4 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+import { useServerFn } from '@tanstack/react-start';
 import { Bell, MessageCircle, Send, Heart, House, ListChecks, Camera } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
@@ -9,6 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
 import { onlineCooldowns } from '@/lib/notification-rules';
+import { syncPartnerNotifications } from '@/lib/notifications.functions';
 
 export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
@@ -22,25 +25,50 @@ export function Chat({ userId, me, partner, messages, profiles }: { userId: stri
   const [open, setOpen] = useState(false);
   const [online, setOnline] = useState(false);
   const [text, setText] = useState('');
+  const [outgoing, setOutgoing] = useState<Array<{ id: string; body: string; user_id: string; created_at: string; status: 'sending' | 'sent' }>>([]);
+  const cache = useQueryClient();
+  const notify = useServerFn(syncPartnerNotifications);
   const end = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const deliveredIds = new Set(messages.map(message => message.id));
+    setOutgoing(previous => previous.filter(message => !deliveredIds.has(message.id)));
+  }, [messages]);
+  const visibleMessages = [...messages, ...outgoing.filter(message => !messages.some(saved => saved.id === message.id))]
+    .sort((a, b) => a.created_at.localeCompare(b.created_at));
   useEffect(() => {
     const ch = supabase.channel('duet-presence', { config: { presence: { key: userId } } });
     ch.on('presence', { event: 'sync' }, () => setOnline(Object.keys(ch.presenceState()).some(k => k !== userId)))
       .subscribe(s => { if (s === 'SUBSCRIBED') void ch.track({ at: Date.now() }); });
     return () => { void supabase.removeChannel(ch); };
   }, [userId]);
-  useEffect(() => { if (open) end.current?.scrollIntoView(); }, [open, messages.length]);
+  useEffect(() => { if (open) end.current?.scrollIntoView(); }, [open, visibleMessages.length]);
   async function send(e: React.FormEvent) {
-    e.preventDefault(); const body = text.trim(); if (!body) return;
-    setText(''); const { error } = await supabase.from('messages').insert({ body, user_id: userId });
-    if (error) { setText(body); toast.error('Mensagem não enviada.'); }
+    e.preventDefault();
+    const body = text.trim();
+    if (!body) return;
+    const temporaryId = crypto.randomUUID();
+    setText('');
+    setOutgoing(current => [...current, { id: temporaryId, body, user_id: userId, created_at: new Date().toISOString(), status: 'sending' }]);
+    try {
+      const { data, error } = await supabase.from('messages').insert({ body, user_id: userId }).select('id,created_at').single();
+      if (error || !data) throw error ?? new Error('Mensagem não confirmada.');
+      setOutgoing(current => current.map(message => message.id === temporaryId ? { ...message, id: data.id, created_at: data.created_at, status: 'sent' } : message));
+      // Realtime not guaranteed on every network: refresh immediately on acknowledgement.
+      void cache.invalidateQueries({ queryKey: ['duet', userId] });
+      // Trigger pending push notifications without waiting for the next heartbeat.
+      void notify({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error));
+    } catch {
+      setOutgoing(current => current.filter(message => message.id !== temporaryId));
+      setText(current => current || body);
+      toast.error('Mensagem não enviada. Tente novamente.');
+    }
   }
   const partnerProfile = profiles.find(p => p.id !== userId);
   return <>
     <Button variant="ghost" size="icon" title="Conversa" aria-label="Abrir conversa" onClick={() => setOpen(true)} className="relative"><MessageCircle size={18}/><span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : 'bg-muted-foreground/40'}`}/></Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[85vh] flex-col">
       <DialogHeader><DialogTitle className="flex items-center gap-3"><Avatar profile={partnerProfile} name={partner}/><span>{partner}<span className={`block text-xs font-normal ${online ? 'text-success' : 'text-muted-foreground'}`}>{online ? 'online agora' : 'offline'}</span></span></DialogTitle></DialogHeader>
-      <div className="min-h-48 flex-1 space-y-2 overflow-y-auto py-2">{messages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : ''}`}><p className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${m.user_id === userId ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{m.body}<span className="mt-1 block text-[10px] opacity-70">{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></p></div>)}{!messages.length && <p className="text-center text-sm text-muted-foreground">Mande um oi para {partner}, {me}. ♡</p>}<div ref={end}/></div>
+      <div className="min-h-48 flex-1 space-y-2 overflow-y-auto py-2">{visibleMessages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : ''}`}><p className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${m.user_id === userId ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{m.body}<span className="mt-1 block text-[10px] opacity-70">{'status' in m && m.status === 'sending' ? 'Enviando… · ' : ''}{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></p></div>)}{!visibleMessages.length && <p className="text-center text-sm text-muted-foreground">Mande um oi para {partner}, {me}. ♡</p>}<div ref={end}/></div>
       <form onSubmit={send} className="flex gap-2"><Input value={text} onChange={e => setText(e.target.value)} placeholder="Escreva uma mensagem…" maxLength={2000}/><Button size="icon" aria-label="Enviar"><Send/></Button></form>
     </DialogContent></Dialog>
   </>;
@@ -68,8 +96,13 @@ export function Tutorial({ userId }: { userId: string }) {
 }
 
 const pushMsg: Record<string, string> = { registered: 'Notificações ativadas! ♡', 'not-configured': 'Atualize a conexão Firebase e inclua notificações web.', unsupported: 'Este navegador não aceita notificações. No iPhone, adicione o Duet à Tela de Início.', 'open-in-new-tab': 'Abra o Duet numa aba própria para ativar.', denied: 'Permita notificações nas configurações do navegador.' };
-export function PushButton({ userId }: { userId: string }) {
+export function PushButton({ userId, hideTrigger = false }: { userId: string; hideTrigger?: boolean }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener('duet:open-notifications', show);
+    return () => window.removeEventListener('duet:open-notifications', show);
+  }, []);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [preferences, setPreferences] = useState({ enabled: true, additions: true, online: true, online_cooldown_minutes: 15 });
@@ -95,12 +128,12 @@ export function PushButton({ userId }: { userId: string }) {
     else { toast.success('Preferências salvas ♡'); setOpen(false); }
   }
   return <>
-    <Button variant="ghost" size="icon" title="Notificações" aria-label="Preferências de notificações" onClick={() => setOpen(true)}><Bell size={18}/></Button>
+    {!hideTrigger && <Button variant="ghost" size="icon" title="Notificações" aria-label="Preferências de notificações" onClick={() => setOpen(true)}><Bell size={18}/></Button>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Nossos avisos ♡</DialogTitle></DialogHeader>
       {!loaded ? <p role="status" className="text-sm text-muted-foreground">Abrindo preferências…</p> : <div className="space-y-5">
         {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Novas adições do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
         <label className="block text-sm">Intervalo entre avisos de presença<select aria-label="Intervalo entre avisos de presença" value={preferences.online_cooldown_minutes} disabled={busy || !preferences.enabled || !preferences.online} onChange={e => setPreferences(p => ({ ...p, online_cooldown_minutes: Number(e.target.value) }))} className="mt-2 h-10 w-full rounded-md border border-input bg-card px-3">{onlineCooldowns.map(value => <option key={value} value={value}>{value} minutos</option>)}</select></label>
-        <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => { setBusy(true); try { const status = await enablePush(userId); status === 'registered' ? toast.success(pushMsg[status]) : toast.error(pushMsg[status]); } catch { toast.error('Não foi possível ativar este aparelho.'); } finally { setBusy(false); } }}><Bell size={16}/>Ativar neste aparelho</Button><Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar preferências'}</Button></div>
+        <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => { setBusy(true); try { const status = await enablePush(userId); if (status === 'registered') toast.success(pushMsg[status]); else toast.error(pushMsg[status]); } catch { toast.error('Não foi possível ativar este aparelho.'); } finally { setBusy(false); } }}><Bell size={16}/>Ativar neste aparelho</Button><Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar preferências'}</Button></div>
       </div>}
     </DialogContent></Dialog>
   </>;

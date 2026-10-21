@@ -179,6 +179,54 @@
   --success: #5D806D;
   --card-foreground: var(--foreground); --popover: var(--card); --popover-foreground: var(--foreground); --ring: var(--primary); --input: var(--border); --success-foreground: #FFFFFF; --subtle: var(--muted-foreground);
 }
+
+/* Paleta pessoal da Letícia: brilho suave, sem interferir nos cliques. */
+[data-theme="pink-glitter"] {
+  color-scheme: light;
+  --background: #FFF6FB;
+  --foreground: #492A3F;
+  --card: #FFFBFE;
+  --card-foreground: #492A3F;
+  --popover: #FFFFFF;
+  --popover-foreground: #492A3F;
+  --primary: #A93675;
+  --primary-foreground: #FFFFFF;
+  --secondary: #F8D9E9;
+  --secondary-foreground: #66304E;
+  --muted: #FCE9F3;
+  --muted-foreground: #73546A;
+  --accent: #F3A9CF;
+  --accent-foreground: #4A1834;
+  --border: #F0CADE;
+  --ring: #A93675;
+  --input: #E9BAD2;
+  --success: #567F68;
+  --success-foreground: #FFFFFF;
+  --subtle: #73546A;
+}
+[data-theme="pink-glitter"] body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.37;
+  background-image:
+    radial-gradient(circle, #F09AC8 1px, transparent 2px),
+    radial-gradient(circle, #D58BB3 1.5px, transparent 2.5px),
+    radial-gradient(circle, #FFFFFF 2px, transparent 3px);
+  background-size: 93px 109px, 147px 139px, 189px 173px;
+  background-position: 10px 12px, 65px 32px, 24px 79px;
+  animation: duet-glitter 8s ease-in-out infinite alternate;
+}
+@keyframes duet-glitter {
+  from { opacity: 0.20; transform: translateY(0); }
+  to { opacity: 0.43; transform: translateY(-8px); }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="pink-glitter"] body::before { animation: none; }
+}
+
   * { border-color: var(--border); }
   html { scroll-behavior: smooth; }
   body { background: var(--background); color: var(--foreground); font-family: var(--font-sans); }

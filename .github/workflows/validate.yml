@@ -24,5 +24,9 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Run automated tests
         run: bun run test
+      - name: Static analysis
+        run: "bunx eslint . --rule 'prettier/prettier: off'"
+      - name: Type check
+        run: bunx tsc --noEmit
       - name: Compile app
         run: bun run build
