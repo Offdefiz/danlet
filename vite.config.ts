@@ -7,6 +7,8 @@
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
 
 export default defineConfig({
+  // Render needs a listening Node process. Keep Lovable’s original target elsewhere.
+  ...(process.env['RENDER'] === 'true' ? { nitro: { preset: 'node-server' as const } } : {}),
   tanstackStart: {
     // Redirect TanStack Start's bundled server entry to src/server.ts (our SSR error wrapper).
     // nitro/vite builds from this
