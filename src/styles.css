@@ -180,51 +180,48 @@
   --card-foreground: var(--foreground); --popover: var(--card); --popover-foreground: var(--foreground); --ring: var(--primary); --input: var(--border); --success-foreground: #FFFFFF; --subtle: var(--muted-foreground);
 }
 
-/* Paleta pessoal da Letícia: brilho suave, sem interferir nos cliques. */
+/* Pink glitter: photographic fine-grain finish inspired by the couple's sample.
+   A cached static SVG avoids animated overlays on mobile WebKit. */
 [data-theme="pink-glitter"] {
   color-scheme: light;
-  --background: #FFF6FB;
-  --foreground: #492A3F;
-  --card: #FFFBFE;
-  --card-foreground: #492A3F;
+  --background: #F8DBE6;
+  --foreground: #512A43;
+  --card: #FFF9FC;
+  --card-foreground: #512A43;
   --popover: #FFFFFF;
-  --popover-foreground: #492A3F;
-  --primary: #A93675;
+  --popover-foreground: #512A43;
+  --primary: #AA3F73;
   --primary-foreground: #FFFFFF;
-  --secondary: #F8D9E9;
-  --secondary-foreground: #66304E;
-  --muted: #FCE9F3;
-  --muted-foreground: #73546A;
-  --accent: #F3A9CF;
-  --accent-foreground: #4A1834;
-  --border: #F0CADE;
-  --ring: #A93675;
-  --input: #E9BAD2;
-  --success: #567F68;
+  --secondary: #F7D2E1;
+  --secondary-foreground: #69344F;
+  --muted: #FCE9F1;
+  --muted-foreground: #795568;
+  --accent: #ECB0C9;
+  --accent-foreground: #4B2337;
+  --border: #E7B6CB;
+  --ring: #AA3F73;
+  --input: #DDA4BB;
+  --success: #517E68;
   --success-foreground: #FFFFFF;
-  --subtle: #73546A;
+  --subtle: #795568;
+}
+[data-theme="pink-glitter"] body {
+  background: linear-gradient(158deg, #F7D6E1, #E5B0C7 63%, #F7D6E1);
+  background-attachment: fixed;
 }
 [data-theme="pink-glitter"] body::before {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 60;
-  opacity: 0.37;
-  background-image:
-    radial-gradient(circle, #F09AC8 1px, transparent 2px),
-    radial-gradient(circle, #D58BB3 1.5px, transparent 2.5px),
-    radial-gradient(circle, #FFFFFF 2px, transparent 3px);
-  background-size: 93px 109px, 147px 139px, 189px 173px;
-  background-position: 10px 12px, 65px 32px, 24px 79px;
-  animation: duet-glitter 8s ease-in-out infinite alternate;
-}
-@keyframes duet-glitter {
-  from { opacity: 0.20; transform: translateY(0); }
-  to { opacity: 0.43; transform: translateY(-8px); }
+  z-index: 2;
+  opacity: .48;
+  background: url("/pink-glitter-grain.svg") repeat;
+  background-size: 256px 256px;
+  mix-blend-mode: screen;
 }
 @media (prefers-reduced-motion: reduce) {
-  [data-theme="pink-glitter"] body::before { animation: none; }
+  [data-theme="pink-glitter"] body { background-attachment: scroll; }
 }
 
   * { border-color: var(--border); }
