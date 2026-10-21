@@ -1,15 +1,16 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
+import { firebaseAccessToken, firebaseCredentials, firebasePushConfigured } from '@/lib/firebase-direct.server';
 
-// Prefer the Render origin or a configured custom domain when independently hosted.
-const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDER_EXTERNAL_URL'] || 'https://danlet.lovable.app').href;
-const APP_ICON = `${APP_URL}icons/duet-192.png`;
-const APP_BADGE = `${APP_URL}icons/duet-badge.png`;
+// Notifications follow the independently hosted web app (or a custom domain).
+const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDER_EXTERNAL_URL'] || 'https://danlet.onrender.com').href;
+const APP_ICON = new URL('icons/duet-192.png', APP_URL).href;
+const APP_BADGE = new URL('icons/duet-badge.png', APP_URL).href;
+export { firebasePushConfigured };
 
-/** FCM renders inside the OS: we control text/icons, not Apple's system chrome. */
 export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string) {
-  const auth = process.env['LOVABLE_API_KEY'];
-  const key = process.env['FIREBASE_MESSAGING_API_KEY'];
-  if (!auth || !key) throw new Error('Notificações não configuradas.');
+  const creds = firebaseCredentials();
+  if (!firebasePushConfigured() || !creds) throw new Error('Notificações push pendentes: configure a conta de serviço Firebase no Render.');
+  const access = await firebaseAccessToken(creds);
   let q = supabaseAdmin.from('push_tokens').select('token,user_id');
   if (userIds) q = q.in('user_id', userIds);
   const { data, error } = await q;
@@ -20,31 +21,31 @@ export async function pushTo(userIds: string[] | null, title: string, body: stri
   let sent = 0;
   for (const { token, user_id } of data ?? []) {
     if (disabledIds.has(user_id)) continue;
-    const res = await fetch('https://connector-gateway.lovable.dev/firebase_messaging/v1/projects/_/messages:send', {
+    const response = await fetch('https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(creds.project_id) + '/messages:send', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${auth}`, 'X-Connection-Api-Key': key, 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(12000),
+      headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' },
       body: JSON.stringify({
         message: {
           token,
-          notification: { title, body, image: undefined },
+          notification: { title, body },
           webpush: {
             fcm_options: { link: APP_URL },
             notification: {
-              title, body, icon: APP_ICON, badge: APP_BADGE,
-              lang: 'pt-BR', dir: 'ltr', silent: false,
-              vibrate: [130, 70, 130],
+              title, body, icon: APP_ICON, badge: APP_BADGE, lang: 'pt-BR',
+              silent: false, vibrate: [130, 70, 130],
               ...(tag ? { tag, renotify: !tag.startsWith('online-') } : {}),
             },
           },
         },
       }),
     });
-    if (res.ok) sent++;
-    else {
-      const message = await res.text();
-      console.error(`FCM [${res.status}]: ${message}`);
-      if (message.includes('UNREGISTERED') || (res.status === 400 && message.includes('registration token')))
-        await supabaseAdmin.from('push_tokens').delete().eq('token', token);
+    if (response.ok) { sent++; continue; }
+    const text = await response.text();
+    // Don't log credentials, individual messages or sensitive device tokens.
+    console.warn('[FCM] Push rejected: HTTP ' + response.status);
+    if (text.includes('UNREGISTERED') || text.includes('registration-token-not-registered')) {
+      await supabaseAdmin.from('push_tokens').delete().eq('token', token);
     }
   }
   return sent;
