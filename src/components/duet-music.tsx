@@ -36,7 +36,7 @@ export function DuetMusic({ records, userId }: { records: Row<"records">[]; user
       const r = await search({ data: { q: q.trim() } });
       setResults(r.results);
       if (r.error) toast.error(r.error);
-      else if (!r.results.length) toast("Nenhum vídeo encontrado.");
+      else if (!r.results.length) toast("Nenhuma música encontrada.");
     } catch {
       toast.error("Não foi possível pesquisar.");
     } finally {
@@ -111,7 +111,7 @@ export function DuetMusic({ records, userId }: { records: Row<"records">[]; user
           </Button>
         </div>
       </form>
-      {busy && <p className="mt-3 text-sm text-muted-foreground">Buscando no YouTube…</p>}
+      {busy && <p className="mt-3 text-sm text-muted-foreground">Buscando músicas…</p>}
       {results.map((r) => (
         <div
           key={r.url}
@@ -144,7 +144,7 @@ export function DuetMusic({ records, userId }: { records: Row<"records">[]; user
                       rel="noreferrer"
                       className="flex min-w-0 items-center gap-2"
                     >
-                      <Youtube size={16} className="shrink-0 text-primary" />
+                      {s.body.includes("youtu") ? <Youtube size={16} className="shrink-0 text-primary" /> : <Music size={16} className="shrink-0 text-primary" />}
                       <span className="truncate">{s.title}</span>
                     </a>
                     <Button
