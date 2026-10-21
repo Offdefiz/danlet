@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
-import { pushTo } from '@/lib/push.server';
+import { pushTo, firebasePushConfigured } from '@/lib/push.server';
 import { currentReminderSlot, reminderMessage } from '@/lib/push-copy';
 
 /**
@@ -10,6 +10,8 @@ import { currentReminderSlot, reminderMessage } from '@/lib/push-copy';
  * Nothing depends on an open browser tab or requires a new database table.
  */
 export async function sendDueInspirations(now = new Date()) {
+  // Do not consume daily idempotency slots when no push service is configured.
+  if (!firebasePushConfigured()) return { sent: 0, reason: 'push-not-configured' as const };
   const slot = currentReminderSlot(now);
   if (!slot) return { sent: 0, reason: 'quiet-hours' as const };
   const { data: members, error } = await supabaseAdmin.from('couple_members').select('user_id');
