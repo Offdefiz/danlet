@@ -1,6 +1,7 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 
-const APP_URL = 'https://danlet.lovable.app/';
+// Prefer the Render origin or a configured custom domain when independently hosted.
+const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDER_EXTERNAL_URL'] || 'https://danlet.lovable.app').href;
 const APP_ICON = `${APP_URL}icons/duet-192.png`;
 const APP_BADGE = `${APP_URL}icons/duet-badge.png`;
 
