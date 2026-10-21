@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
-import { createPublicKey, generateKeyPairSync, verify } from 'node:crypto';
+import { generateKeyPairSync, verify } from 'node:crypto';
 import { firebaseAccessToken, firebaseCredentials } from '@/lib/firebase-direct.server';
 import { isPublicHttpsUrl, searchWeb, SearchNotConfigured } from '@/lib/firecrawl-direct.server';
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
@@ -42,7 +42,7 @@ describe('Independent providers', () => {
     const assertion = new URLSearchParams(opts.body).get('assertion')!;
     const segments = assertion.split('.');
     expect(segments).toHaveLength(3);
-    const ok = verify('RSA-SHA256', Buffer.from(segments[0] + '.' + segments[1]), createPublicKey(publicKey), Buffer.from(segments[2]!, 'base64url'));
+    const ok = verify('RSA-SHA256', Buffer.from(segments[0] + '.' + segments[1]), publicKey, Buffer.from(segments[2]!, 'base64url'));
     expect(ok).toBe(true);
     const claims = JSON.parse(Buffer.from(segments[1]!, 'base64url').toString('utf8')) as { scope: string };
     expect(claims.scope).toBe('https://www.googleapis.com/auth/firebase.messaging');
