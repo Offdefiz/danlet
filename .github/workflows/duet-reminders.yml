@@ -1,0 +1,34 @@
+name: Duet notifications scheduler
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - name: Deliver queued events and daytime reminders
+        env:
+          DUET_CRON_SECRET: ${{ secrets.DUET_CRON_SECRET }}
+          DUET_CRON_ENDPOINT: ${{ vars.DUET_CRON_ENDPOINT }}
+        run: |
+          set -euo pipefail
+          if [ -z "${DUET_CRON_SECRET}" ]; then
+            echo "DUET_CRON_SECRET is not configured: no notifications will be sent."
+            exit 0
+          fi
+          endpoint="${DUET_CRON_ENDPOINT:-https://danlet.onrender.com}"
+          for route in partner-notifications inspire; do
+            echo "Requesting ${route} (response omitted to avoid exposing private data)"
+            curl --fail --silent --show-error --retry 2 --retry-delay 4 \
+              --connect-timeout 15 --max-time 135 \
+              -X POST -H "Authorization: Bearer ${DUET_CRON_SECRET}" \
+              -H "Content-Type: application/json" \
+              -o /dev/null "${endpoint%/}/api/public/jobs/${route}"
+          done
