@@ -130,6 +130,11 @@ export function PushButton({ userId, hideTrigger = false }: { userId: string; hi
   return <>
     {!hideTrigger && <Button variant="ghost" size="icon" title="Notificações" aria-label="Preferências de notificações" onClick={() => setOpen(true)}><Bell size={18}/></Button>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Nossos avisos ♡</DialogTitle></DialogHeader>
+      <div className="rounded-xl border border-border bg-secondary/50 p-3 text-sm">
+        <p className="font-medium">Um carinho para lembrar de nós 💗</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Além das mensagens e das novidades, o Duet pode lembrar vocês de conversar e sonhar juntos até 3 vezes ao dia, entre 9h e 21h (horário de Brasília), quando a rotina de lembretes estiver ativada no servidor.</p>
+        <p className="mt-1 text-xs text-muted-foreground">Para não receber avisos, desligue «Receber notificações push». No iPhone, abra o Duet pelo ícone adicionado à Tela de Início para ativar os avisos.</p>
+      </div>
       {!loaded ? <p role="status" className="text-sm text-muted-foreground">Abrindo preferências…</p> : <div className="space-y-5">
         {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Novas adições do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
         <label className="block text-sm">Intervalo entre avisos de presença<select aria-label="Intervalo entre avisos de presença" value={preferences.online_cooldown_minutes} disabled={busy || !preferences.enabled || !preferences.online} onChange={e => setPreferences(p => ({ ...p, online_cooldown_minutes: Number(e.target.value) }))} className="mt-2 h-10 w-full rounded-md border border-input bg-card px-3">{onlineCooldowns.map(value => <option key={value} value={value}>{value} minutos</option>)}</select></label>
