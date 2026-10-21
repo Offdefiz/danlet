@@ -49,7 +49,7 @@ async function scrapeMeta(url: string) {
   return { title: pick('ogTitle') || pick('title'), description: pick('ogDescription') || pick('description'), image: pick('ogImage') || pick('og:image') };
 }
 
-async function storeImage(supabase: any, userId: string, image: string) {
+async function storeImage(supabase: SupabaseClient<Database>, userId: string, image: string) {
   if (!image.startsWith('https://')) return null;
   const res = await fetch(image); if (!res.ok) return null;
   const type = res.headers.get('content-type') ?? 'image/jpeg'; if (!type.startsWith('image/')) return null;
