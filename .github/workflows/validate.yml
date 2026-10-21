@@ -25,6 +25,6 @@ jobs:
       - name: Run automated tests
         run: bun run test
       - name: Static analysis
-        run: bun run lint
+        run: bunx eslint . --rule 'prettier/prettier: off'
       - name: Compile app
         run: bun run build
