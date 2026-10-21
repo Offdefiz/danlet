@@ -73,4 +73,4 @@ bun run test
 bun run build
 ```
 
-A dependência de **build** `@lovable.dev/vite-tanstack-config` permanece temporariamente para evitar regressões enquanto é substituída de forma controlada; o servidor do Render não faz chamadas ao gateway Lovable para pesquisa ou push.
+O build usa **TanStack Start + Vite + Nitro diretamente**, sem o pacote de configuração do Lovable. O servidor do Render também não faz chamadas ao gateway Lovable para pesquisa ou push.
