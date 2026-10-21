@@ -9,7 +9,7 @@
 - **Push**: Firebase Cloud Messaging (FCM) HTTP v1 direto, sem Lovable. O projeto Firebase e a conta de serviço precisam pertencer aos responsáveis pelo Duet.
 - **Cron**: GitHub Actions roda a cada hora, sob limites gratuitos aplicáveis, usando segredo compartilhado com o Render. Um cron pago não foi provisionado.
 - **Calendário**: agenda interna no Supabase e exportação Apple .ics/Google; não é sincronização bidirecional automática.
-- **Build**: pacote `@lovable.dev/vite-tanstack-config` ainda utilizado como dependência de desenvolvimento do Vite. Não é gateway de runtime, mas será possível removê-lo em uma atualização de build separada com testes completos.
+- **Build**: TanStack Start + Vite + Nitro oficiais, sem o wrapper `@lovable.dev/vite-tanstack-config` e sem dependência de build do Lovable.
 
 ## Configuração segura no Render
 
