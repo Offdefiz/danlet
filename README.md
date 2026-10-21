@@ -48,25 +48,29 @@ Utilize dados fictícios (mock data) baseados em: Escritório de Advocacia, Viag
 
 O layout deve ser perfeito e responsivo para telas de celular (mobile-first approach). Mantenha o código limpo, componentizado e funcional.
 
-This project was built with [Lovable](https://lovable.dev).
+## Hospedagem e arquitetura independente
 
-**Live app**: https://danlet.lovable.app
+O Duet é um PWA privado para organização do casal. Seu código-fonte é mantido no GitHub, com deploy automático no Render.
 
-## Build with Lovable
+- **Aplicativo independente:** [Duet no Render](https://danlet.onrender.com)
+- **Código:** [Offdefiz/danlet](https://github.com/Offdefiz/danlet)
+- **Banco, autenticação e arquivos:** Supabase externo com políticas RLS e dados do casal preservados.
+- **Pesquisas:** música via iTunes Search API gratuita; referências e Instagram via Firecrawl REST direto se configurado.
+- **Push:** Firebase HTTP v1 com conta administrada pelos responsáveis (precisa de configuração no Render).
+- **Agendador:** GitHub Actions. Os segredos são configurados em Actions e no Render, nunca commitados.
 
-Continue developing this project in the [Lovable editor](https://lovable.dev/projects/73696b8f-8a21-4e72-ae61-3e9f99ab5921).
+Para preparar as integrações independentes, conferir os riscos de migração, as variáveis exigidas e os testes em iPhone:
+[Guia de infraestrutura independente](docs/DUET_INDEPENDENT_INFRA.md).
 
-- **Ship faster**: describe what you want to build and Lovable handles the code.
-- **Stay in sync**: every change made in Lovable is committed straight to this repository.
-- **Full ownership**: this code is yours. Push to `main` on GitHub and your changes sync back into Lovable, ready for your next prompt.
+### Desenvolvimento
 
-## Development
-
-Prefer working locally? You need Node.js and npm — [install with nvm](https://github.com/nvm-sh/nvm#installing-and-updating).
+O repositório mantém o projeto React / TanStack Start, com builds validados em CI. Rode localmente:
 
 ```sh
-git clone <this-repository-url>
-cd <repository-name>
-npm i
-npm run dev
+bun install
+bun run dev
+bun run test
+bun run build
 ```
+
+A dependência de **build** `@lovable.dev/vite-tanstack-config` permanece temporariamente para evitar regressões enquanto é substituída de forma controlada; o servidor do Render não faz chamadas ao gateway Lovable para pesquisa ou push.
