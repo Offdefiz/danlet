@@ -11,7 +11,7 @@ import type { Row } from '@/lib/duet.types';
 
 export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, sync }: {
   name: string;
-  profile?: Row<'profiles'>;
+  profile?: Row<'profiles'> | undefined;
   onProfile: () => void;
   onSignOut: () => void;
   online: boolean;
