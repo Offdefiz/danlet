@@ -26,8 +26,9 @@ afterEach(() => {
 });
 
 describe('Personal themes stored on each device', () => {
-  it('preserves all nine available palettes', () => {
-    expect(themes).toHaveLength(9);
+  it('preserves all nine palettes and adds pink glitter', () => {
+    expect(themes).toHaveLength(10);
+    expect(themes.find(t => t.id === 'pink-glitter')?.label).toMatch(/Glitter/);
   });
 
   it('saves a palette in localStorage and restores it when reopened', async () => {
