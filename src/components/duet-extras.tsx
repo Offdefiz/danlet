@@ -96,8 +96,13 @@ export function Tutorial({ userId }: { userId: string }) {
 }
 
 const pushMsg: Record<string, string> = { registered: 'Notificações ativadas! ♡', 'not-configured': 'Atualize a conexão Firebase e inclua notificações web.', unsupported: 'Este navegador não aceita notificações. No iPhone, adicione o Duet à Tela de Início.', 'open-in-new-tab': 'Abra o Duet numa aba própria para ativar.', denied: 'Permita notificações nas configurações do navegador.' };
-export function PushButton({ userId }: { userId: string }) {
+export function PushButton({ userId, hideTrigger = false }: { userId: string; hideTrigger?: boolean }) {
   const [open, setOpen] = useState(false);
+  useEffect(() => {
+    const show = () => setOpen(true);
+    window.addEventListener('duet:open-notifications', show);
+    return () => window.removeEventListener('duet:open-notifications', show);
+  }, []);
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [preferences, setPreferences] = useState({ enabled: true, additions: true, online: true, online_cooldown_minutes: 15 });
@@ -123,7 +128,7 @@ export function PushButton({ userId }: { userId: string }) {
     else { toast.success('Preferências salvas ♡'); setOpen(false); }
   }
   return <>
-    <Button variant="ghost" size="icon" title="Notificações" aria-label="Preferências de notificações" onClick={() => setOpen(true)}><Bell size={18}/></Button>
+    {!hideTrigger && <Button variant="ghost" size="icon" title="Notificações" aria-label="Preferências de notificações" onClick={() => setOpen(true)}><Bell size={18}/></Button>}
     <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Nossos avisos ♡</DialogTitle></DialogHeader>
       {!loaded ? <p role="status" className="text-sm text-muted-foreground">Abrindo preferências…</p> : <div className="space-y-5">
         {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Novas adições do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
