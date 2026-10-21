@@ -24,5 +24,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Run automated tests
         run: bun run test
+      - name: Static analysis
+        run: bun run lint
       - name: Compile app
         run: bun run build
