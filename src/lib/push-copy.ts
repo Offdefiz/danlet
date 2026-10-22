@@ -13,6 +13,21 @@ export function formatPartnerPush(person: string, kind: string, eventBody: strin
 
 // Little surprises unrelated to the planning/agenda area. No generative AI,
 // external API or fabricated claims about the partner are used.
+/** Only known, opt-in quick-answer formats appear on the partner's lock screen.
+ * Ordinary chat messages always remain private ("you have a message"). */
+export function formatQuickReplyPush(person: string, body: string): PushCopy | null {
+  const title = 'Duet ♡';
+  if (body.startsWith('Já bebeu água hoje? — ')) {
+    if (body.includes('Sim, já bebi')) return { title, body: person + ' bebeu água hoje! Missão hidratação cumprida. 💧' };
+    if (body.includes('Ainda não')) return { title, body: person + ' ainda não bebeu água. Que tal um lembrete carinhoso? 🥤' };
+    if (body.includes('Não sei')) return { title, body: person + ' está investigando se já bebeu água hoje. 🕵️' };
+  }
+  if (body.endsWith(' — Ainda não sei') || body.endsWith(' — Nada planejado por enquanto')) {
+    return { title, body: person + ' ainda está pensando num plano. Que tal escolherem juntos? ♡' };
+  }
+  return null;
+}
+
 export const sweetReminders = [
   'Boletim do Duet: hoje vale mandar um oi só porque sim. 💌',
   'Atenção: um abraço gostoso está oficialmente recomendado. 🤗',
