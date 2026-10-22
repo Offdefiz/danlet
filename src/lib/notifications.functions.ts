@@ -8,6 +8,9 @@ export const syncPartnerNotifications = createServerFn({ method: 'POST' })
   .handler(async ({ context, data }) => {
     const { data: member, error } = await context.supabase.from('couple_members').select('user_id').eq('user_id', context.userId).maybeSingle();
     if (error || !member) throw new Error('Acesso reservado ao casal.');
+    // The couple's authenticated features should not fail just because the
+    // optional administrative push backend has not been configured on Render.
+    if (!process.env['SUPABASE_SERVICE_ROLE_KEY']) return { sent: 0, backendPending: true };
     const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
     if (data.heartbeat) {
       const result = await supabaseAdmin.rpc('heartbeat_duet_push', { actor: context.userId });
