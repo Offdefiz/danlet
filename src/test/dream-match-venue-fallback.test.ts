@@ -8,7 +8,7 @@ describe('Dream Match venue fallback', () => {
     expect(venues.map(v => v.title)).toEqual([
       'Alma Serra Vila — eventos',
       'Espaço Raízes — Tiradentes',
-      'Pousada Brisa da Serra — guia de fornecedores',
+      'Pousada Brisa da Serra — casamentos',
     ]);
     for (const venue of venues) {
       expect(venue.url).toMatch(/^https:\/\//);
