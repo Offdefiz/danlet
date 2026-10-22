@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
@@ -55,7 +55,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const search = useServerFn(findReferences);
   const getPhoto = useServerFn(fetchPhoto);
   const addInsta = useServerFn(addFromInstagram);
-  const [tried, setTried] = useState<Set<string>>(new Set());
+  const triedPhotos = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   useEffect(() => {
     const update = () => setOnline(navigator.onLine);
@@ -66,6 +66,26 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const me = data?.members.find(m => m.user_id === userId);
   const partner = data?.members.find(m => m.user_id !== userId);
   const partnerName = partner?.person ?? (me?.person === 'Daniel' ? 'Letícia' : 'Daniel');
+  // Photo enrichment is an asynchronous effect, never a state mutation during
+  // render. Only try the visible card, once per session, to avoid request storms.
+  const previewRef = data && (detail ?? rankReferences(
+    data.references.filter(ref =>
+      ref.category === category &&
+      (!state || ref.state === state) &&
+      (!city || ref.city === city) &&
+      (!scenery || ref.scenery === scenery) &&
+      !data.votes.some(v => v.reference_id === ref.id && v.user_id === userId) &&
+      !locallyVoted.has(ref.id)),
+    data.votes, userId, data.references,
+  )[0]);
+  useEffect(() => {
+    if (!previewRef || previewRef.image_path || triedPhotos.current.has(previewRef.id)) return;
+    triedPhotos.current.add(previewRef.id);
+    void getPhoto({ data: { id: previewRef.id } })
+      .then(result => { if (result.ok) void cache.invalidateQueries({ queryKey: ['duet', userId] }); })
+      .catch(() => { /* A manual photo can still be uploaded in the details dialog. */ });
+  }, [previewRef?.id, previewRef?.image_path, cache, getPhoto, userId]);
+
 
   async function mutate(action: () => PromiseLike<{ error: { message: string } | null }>) {
     if (!navigator.onLine) { toast.error('Sem conexão. Sua alteração ainda não foi salva.'); return false; }
@@ -151,8 +171,6 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const refs = data.references.filter(r => r.category === category && (!state || r.state === state) && (!city || r.city === city) && (!scenery || r.scenery === scenery));
   const pending = rankReferences(refs.filter(r => !(data.votes.some(v => v.reference_id === r.id && v.user_id === userId) || locallyVoted.has(r.id))), data.votes, userId, data.references);
   const current = pending[0];
-  const missing = [current, detail].find(r => r && !r.image_path && !tried.has(r.id));
-  if (missing) { setTried(new Set(tried).add(missing.id)); void getPhoto({ data: { id: missing.id } }).then(r => { if (r.ok) void cache.invalidateQueries({ queryKey: ['duet', userId] }); }).catch(() => {}); }
   const historyRefs = refs.filter(r => {
     const my = data.votes.find(v => v.reference_id === r.id && v.user_id === userId);
     const other = partnerVote(data.votes, r.id, userId);
