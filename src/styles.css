@@ -180,48 +180,116 @@
   --card-foreground: var(--foreground); --popover: var(--card); --popover-foreground: var(--foreground); --ring: var(--primary); --input: var(--border); --success-foreground: #FFFFFF; --subtle: var(--muted-foreground);
 }
 
-/* Pink glitter: photographic fine-grain finish inspired by the couple's sample.
-   A cached static SVG avoids animated overlays on mobile WebKit. */
+/* Barbie-inspired rose glitter: a fine photographic grain plus actual
+   twinkling highlights. All decorative layers ignore touch/clicks. */
 [data-theme="pink-glitter"] {
   color-scheme: light;
-  --background: #F8DBE6;
-  --foreground: #512A43;
-  --card: #FFF9FC;
-  --card-foreground: #512A43;
-  --popover: #FFFFFF;
-  --popover-foreground: #512A43;
-  --primary: #AA3F73;
+  --background: #F4C9DB;
+  --foreground: #55233E;
+  --card: #FFF7FC;
+  --card-foreground: #55233E;
+  --popover: #FFF9FD;
+  --popover-foreground: #55233E;
+  --primary: #AF286D;
   --primary-foreground: #FFFFFF;
-  --secondary: #F7D2E1;
-  --secondary-foreground: #69344F;
-  --muted: #FCE9F1;
-  --muted-foreground: #795568;
-  --accent: #ECB0C9;
-  --accent-foreground: #4B2337;
-  --border: #E7B6CB;
-  --ring: #AA3F73;
-  --input: #DDA4BB;
-  --success: #517E68;
+  --secondary: #FAD6E7;
+  --secondary-foreground: #652747;
+  --muted: #FDE8F1;
+  --muted-foreground: #754C63;
+  --accent: #EA8DBB;
+  --accent-foreground: #542440;
+  --border: #E5A4BF;
+  --ring: #B32E70;
+  --input: #DF9EB8;
+  --success: #487E66;
   --success-foreground: #FFFFFF;
-  --subtle: #795568;
+  --subtle: #754C63;
 }
 [data-theme="pink-glitter"] body {
-  background: linear-gradient(158deg, #F7D6E1, #E5B0C7 63%, #F7D6E1);
+  background: linear-gradient(155deg, #F9E1EC 0%, #ECBAD0 42%, #F5D1E0 77%, #F9E4EE 100%);
   background-attachment: fixed;
 }
-[data-theme="pink-glitter"] body::before {
+[data-theme="pink-glitter"] body::before,
+[data-theme="pink-glitter"] body::after {
   content: "";
   position: fixed;
   inset: 0;
   pointer-events: none;
-  z-index: 2;
-  opacity: .48;
-  background: url("/pink-glitter-grain.svg") repeat;
-  background-size: 256px 256px;
+  border: 0;
+}
+[data-theme="pink-glitter"] body::before {
+  z-index: 1;
+  opacity: .72;
+  background-image: url("/pink-glitter-grain.svg"), 
+    radial-gradient(circle at 23% 12%, #fff9 0 1px, transparent 2px),
+    radial-gradient(circle at 67% 44%, #fff9 0 1px, transparent 2px),
+    radial-gradient(circle at 82% 78%, #fff8 0 1px, transparent 2px);
+  background-size: 256px 256px, 94px 108px, 131px 123px, 79px 113px;
+  background-repeat: repeat;
   mix-blend-mode: screen;
+}
+[data-theme="pink-glitter"] body::after {
+  z-index: 2;
+  opacity: .18;
+  background-image:
+    radial-gradient(circle at 12% 18%, #fff 0 2px, #fff8 3px, transparent 11px),
+    radial-gradient(circle at 79% 31%, #fff 0 1.5px, #fff7 3px, transparent 9px),
+    radial-gradient(circle at 31% 73%, #fff 0 2px, #fff8 4px, transparent 12px),
+    radial-gradient(circle at 88% 86%, #fff 0 1.5px, #fff6 3px, transparent 10px),
+    linear-gradient(120deg, transparent 42%, #fff3 50%, transparent 58%);
+  background-size: 350px 425px, 480px 410px, 410px 500px, 520px 470px, 100% 100%;
+  mix-blend-mode: screen;
+  will-change: opacity;
+  animation: duet-barbie-twinkle 5.8s ease-in-out infinite alternate;
+}
+/* Keep the product interface readable over glitter: translucent panels are
+   deliberately opaque enough for text and controls on every iPhone size. */
+[data-theme="pink-glitter"] .glass-panel,
+[data-theme="pink-glitter"] .bg-card {
+  box-shadow: 0 8px 28px #B4477714, inset 0 1px #FFFFFFC9;
+}
+[data-theme="pink-glitter"] .bg-primary {
+  box-shadow: 0 5px 18px #9E2D6652, inset 0 1px #FFFFFF52;
+}
+[data-theme="pink-glitter"] .garden-band {
+  background: linear-gradient(110deg, #FFFBFDE8, #F9DEECE0, #FFF2F9EA);
+  border-radius: 18px;
+  padding-inline: 1rem;
+}
+@keyframes duet-barbie-twinkle {
+  0% { opacity: .12; }
+  47% { opacity: .51; }
+  100% { opacity: .21; }
+}
+/* Picker swatch animates while choosing, without applying the whole theme. */
+.duet-glitter-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  background: linear-gradient(145deg, #FDE8F1, #E9A6C3 65%, #F5C6DD);
+}
+.duet-glitter-preview::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: url("/pink-glitter-grain.svg") repeat;
+  background-size: 128px 128px;
+  opacity: .85;
+  mix-blend-mode: screen;
+}
+.duet-glitter-preview::after {
+  content: "✦";
+  position: absolute;
+  top: 4%;
+  right: 10%;
+  color: white;
+  text-shadow: 0 0 9px white, -42px 18px 3px #fff, -19px 35px 2px #fff;
+  animation: duet-barbie-twinkle 3s ease-in-out infinite alternate;
 }
 @media (prefers-reduced-motion: reduce) {
   [data-theme="pink-glitter"] body { background-attachment: scroll; }
+  [data-theme="pink-glitter"] body::after, .duet-glitter-preview::after { animation: none !important; opacity: .4; will-change: auto; }
 }
 
   * { border-color: var(--border); }
