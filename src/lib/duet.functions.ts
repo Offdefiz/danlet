@@ -1,24 +1,9 @@
 import { createServerFn } from '@tanstack/react-start';
 import { z } from 'zod';
-import { createClient, type SupabaseClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { searchWeb, scrapeWebMeta as scrapeMeta, isPublicHttpsUrl } from '@/lib/firecrawl-direct.server';
-
-export const nameLogin = createServerFn({ method: 'POST' })
-  .inputValidator(z.object({ person: z.enum(['Daniel', 'Letícia']), password: z.string().min(1).max(200) }))
-  .handler(async ({ data }) => {
-    const { supabaseAdmin } = await import('@/integrations/supabase/client.server');
-    const { data: member } = await supabaseAdmin.from('couple_members').select('user_id').eq('person', data.person).maybeSingle();
-    if (!member) return { session: null, error: 'Conta ainda não configurada ou senha incorreta.' };
-    const { data: account } = await supabaseAdmin.auth.admin.getUserById(member.user_id);
-    const url = process.env['SUPABASE_URL'];
-    const key = process.env['SUPABASE_PUBLISHABLE_KEY'];
-    if (!url || !key || !account.user?.email) return { session: null, error: 'Não foi possível entrar.' };
-    const client = createClient(url, key, { auth: { persistSession: false, autoRefreshToken: false } });
-    const result = await client.auth.signInWithPassword({ email: account.user.email, password: data.password });
-    return { session: result.data.session, error: result.error ? 'Conta ainda não configurada ou senha incorreta.' : null };
-  });
 
 export const findReferences = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
