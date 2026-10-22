@@ -54,6 +54,11 @@ describe('Signed GitHub Actions identity', () => {
     expect(await verifyDuetSchedulerIdentity(makeToken(change))).toBe(false);
   });
   it('accepts main-branch updates for diagnostics', async () => { expect(await verifyDuetSchedulerIdentity(makeToken({ event_name: 'push' }))).toBe(true); });
+  it('accepts a custom signed subject while enforcing repository and workflow claims', async () => {
+    const customized = makeToken({ sub: 'custom-subject:template:v2' });
+    expect(await verifyDuetSchedulerIdentity(customized)).toBe(true);
+    expect(await verifyDuetSchedulerIdentity(makeToken({ sub: 'custom-subject:template:v2', repository: 'attacker/repo' }))).toBe(false);
+  });
   it('rejects altered signatures and non-RS256 headers', async () => {
     const token = makeToken();
     const bits = token.split('.');
