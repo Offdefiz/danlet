@@ -40,6 +40,19 @@ export function DuetQuestions({ records, members, userId, onSaved }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  async function quickReply(label: string, question: string) {
+    if (!navigator.onLine) { toast.error('Sem internet para enviar sua resposta.'); return; }
+    setBusy(true);
+    try {
+      const { error } = await supabase.from('messages').insert({ user_id: userId, body: question + ' — ' + label });
+      if (error) throw error;
+      await onSaved();
+      playDuetSound('success', userId);
+      toast.success('Resposta enviada para seu par ♡');
+      setSelected(null);
+    } catch { toast.error('Não foi possível enviar. Tente novamente.'); }
+    finally { setBusy(false); }
+  }
   async function submit(e: React.FormEvent) {
     e.preventDefault();
     if (!selected || busy) return;
@@ -84,6 +97,15 @@ export function DuetQuestions({ records, members, userId, onSaved }: Props) {
         </button>;
       })}
     </div>
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <h2 className="font-semibold">Um carinho durante o dia 💧</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Já bebeu água hoje? Responda rapidinho para seu par.</p>
+      <div className="mt-3 flex flex-wrap gap-2">
+        {['Sim, já bebi 💗', 'Ainda não 😅', 'Não sei 🤔'].map(label =>
+          <Button type="button" key={label} variant="outline" size="sm" disabled={busy} onClick={() => void quickReply(label, 'Já bebeu água hoje?')}>{label}</Button>)}
+      </div>
+      <p className="mt-2 text-xs text-muted-foreground">Esta resposta é uma mensagem, não um compromisso na agenda.</p>
+    </div>
     {chosen && <form onSubmit={submit} className="space-y-4 rounded-2xl border border-primary/30 bg-card p-5">
       <div className="flex items-center gap-2 text-primary"><Heart size={18}/><h2 className="font-semibold">{chosen.title}</h2></div>
       <label className="block text-sm font-medium">Sua ideia
@@ -93,6 +115,10 @@ export function DuetQuestions({ records, members, userId, onSaved }: Props) {
         <label className="block text-sm">Horário <Input className="mt-1" required type="time" value={time} onChange={e => setTime(e.target.value)}/></label>
       </div>
       <p className="flex items-start gap-2 text-xs text-muted-foreground"><CalendarDays size={15} className="shrink-0"/>Ao salvar, sua resposta aparece no calendário compartilhado. Vocês podem ajustar a data depois.</p>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void quickReply('Ainda não sei', chosen.title)}>Ainda não sei</Button>
+        <Button type="button" variant="outline" disabled={busy} onClick={() => void quickReply('Nada planejado por enquanto', chosen.title)}>Sem planos ainda</Button>
+      </div>
       <Button className="w-full" disabled={busy || !answer.trim()}>{busy ? 'Salvando…' : 'Guardar nosso plano'} <Sparkles size={16}/></Button>
     </form>}
     <div className="rounded-2xl border border-border bg-card p-4">
