@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { searchWeb, scrapeWebMeta as scrapeMeta, isPublicHttpsUrl } from '@/lib/firecrawl-direct.server';
+import { getCuratedWeddingVenues } from '@/lib/duet-venue-fallback';
 
 export const findReferences = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -14,11 +15,22 @@ export const findReferences = createServerFn({ method: 'POST' })
     const query = data.category === 'Locais'
       ? 'locais casamento ' + (data.region || 'Capitólio Tiradentes Ouro Preto MG Serra Guarapari Vitória ES Búzios Petrópolis RJ') + ' site oficial'
       : data.category + ' casamento English Garden ' + data.region + ' referências reais';
+    const curated = () => getCuratedWeddingVenues(data.category, data.region)
+      .map(item => ({ title: item.title, source_url: item.url, description: item.description }));
     try {
       const results = await searchWeb(query, 8);
-      return { results: results.map(item => ({ title: item.title, source_url: item.url, description: item.description ?? '' })), error: null };
+      if (results.length) {
+        return { results: results.map(item => ({ title: item.title, source_url: item.url, description: item.description ?? '' })), error: null };
+      }
+      const fallback = curated();
+      return { results: fallback, error: fallback.length
+        ? 'A busca não encontrou novas páginas. Exibindo referências públicas já identificadas para a região; confirme os detalhes diretamente com cada local.'
+        : null };
     } catch (error) {
-      return { results: [], error: error instanceof Error ? error.message : 'Pesquisa temporariamente indisponível.' };
+      const fallback = curated();
+      return { results: fallback, error: fallback.length
+        ? 'A pesquisa ao vivo está indisponível. Exibindo referências públicas previamente identificadas; são sugestões, não uma lista de locais em alta.'
+        : error instanceof Error ? error.message : 'Pesquisa temporariamente indisponível.' };
     }
   });
 async function storeImage(supabase: SupabaseClient<Database>, userId: string, image: string) {
