@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentReminderSlot, formatPartnerPush, reminderMessage, reminderSlots } from '@/lib/push-copy';
+import { currentReminderSlot, formatPartnerPush, formatQuickReplyPush, reminderMessage, reminderSlots } from '@/lib/push-copy';
 
 describe('Duet notification presentation', () => {
   it('does not repeat Duet/actor in notification title and formats partner presence', () => {
@@ -12,6 +12,12 @@ describe('Duet notification presentation', () => {
     const result = formatPartnerPush('Daniel', 'addition', 'enviou uma mensagem no chat');
     expect(result.title).toBe('Duet ♡');
     expect(result.body).toMatch(/Daniel.*mensagem/);
+  });
+  it('personalizes only explicit quick replies, never arbitrary chat contents', () => {
+    expect(formatQuickReplyPush('Letícia', 'Já bebeu água hoje? — Sim, já bebi 💗')?.body).toMatch(/Letícia.*bebeu água/);
+    expect(formatQuickReplyPush('Daniel', 'Já bebeu água hoje? — Ainda não 😅')?.body).toMatch(/Daniel.*ainda não/);
+    expect(formatQuickReplyPush('Letícia', 'Que passeio? — Ainda não sei')?.body).toMatch(/escolherem juntos/);
+    expect(formatQuickReplyPush('Letícia', 'Mensagem secreta')).toBeNull();
   });
   it('creates varied, bounded reminders with daylight-only hours', () => {
     expect(reminderSlots).toHaveLength(5);
