@@ -38,26 +38,6 @@ jobs:
             echo "::error::Unable to obtain the scheduler identity token."
             exit 1
           fi
-          # Diagnostic only: compare public workflow claims without logging the
-          # signed JWT, bearer credential, personal data or complete claims.
-          OIDC_TOKEN="$token" node - <<'NODE'
-          const [headerText, payloadText] = process.env.OIDC_TOKEN.split('.');
-          const claims = JSON.parse(Buffer.from(payloadText, 'base64url').toString('utf8'));
-          const header = JSON.parse(Buffer.from(headerText, 'base64url').toString('utf8'));
-          const expected = {
-            iss: 'https://token.actions.githubusercontent.com',
-            aud: 'duet-render-cron',
-            repository: 'Offdefiz/danlet',
-            ref: 'refs/heads/main',
-            workflow_ref: 'Offdefiz/danlet/.github/workflows/duet-reminders.yml@refs/heads/main',
-            sub: 'repo:Offdefiz/danlet:ref:refs/heads/main',
-            event_name: process.env.GITHUB_EVENT_NAME,
-          };
-          for (const [key, value] of Object.entries(expected)) {
-            console.log('OIDC claim ' + key + ': ' + (claims[key] === value ? 'match' : 'DIFFERENT'));
-          }
-          console.log('OIDC algorithm: ' + (header.alg === 'RS256' ? 'RS256' : 'different'));
-          NODE
           endpoint='https://danlet.onrender.com'
           # A new workflow version verifies OIDC immediately on merge, but
           # does not send surprise notifications simply because code changed.
