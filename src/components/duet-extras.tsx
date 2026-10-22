@@ -12,6 +12,7 @@ import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
 import { onlineCooldowns } from '@/lib/notification-rules';
 import { syncPartnerNotifications } from '@/lib/notifications.functions';
+import { playDuetSound } from '@/lib/duet-sounds';
 
 export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
@@ -55,6 +56,7 @@ export function Chat({ userId, me, partner, messages, profiles }: { userId: stri
       if (error || !data) throw error ?? new Error('Mensagem não confirmada.');
       setOutgoing(current => current.map(message => message.id === temporaryId ? { ...message, id: data.id, created_at: data.created_at, status: 'sent' } : message));
       // Realtime not guaranteed on every network: refresh immediately on acknowledgement.
+      playDuetSound('success', userId);
       void cache.invalidateQueries({ queryKey: ['duet', userId] });
       // Trigger pending push notifications without waiting for the next heartbeat.
       void notify({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error));
