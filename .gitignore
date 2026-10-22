@@ -30,3 +30,6 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+# Firebase server credentials belong in Render secret files, never in Git.
+**/firebase-service-account*.json
+**/*-firebase-adminsdk-*.json

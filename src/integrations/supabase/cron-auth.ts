@@ -2,8 +2,12 @@
 export async function authenticateCronRequest(
   request: Request,
 ): Promise<Response | null> {
-  const currentSecret = process.env['LOVABLE_CRON_SECRET']
-  const previousSecret = process.env['LOVABLE_CRON_SECRET_PREVIOUS']
+  const duetSecret = process.env['DUET_CRON_SECRET']
+  const currentSecret = duetSecret || process.env['LOVABLE_CRON_SECRET']
+  // Keep rotation in the selected namespace so migrated legacy keys stop working.
+  const previousSecret = duetSecret
+    ? process.env['DUET_CRON_SECRET_PREVIOUS']
+    : process.env['LOVABLE_CRON_SECRET_PREVIOUS']
 
   if (!currentSecret) {
     return new Response('Server configuration error', { status: 500 })

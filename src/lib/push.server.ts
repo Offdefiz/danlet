@@ -5,6 +5,21 @@ import { firebaseAccessToken, firebaseCredentials, firebasePushConfigured } from
 const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDER_EXTERNAL_URL'] || 'https://danlet.onrender.com').href;
 const APP_ICON = new URL('icons/duet-192.png', APP_URL).href;
 const APP_BADGE = new URL('icons/duet-badge.png', APP_URL).href;
+
+function isPermanentFcmTokenFailure(status: number, body: string): boolean {
+  const expectedCode = status === 403 ? 'SENDER_ID_MISMATCH' : status === 404 ? 'UNREGISTERED' : null;
+  if (!expectedCode) return false;
+  try {
+    const payload = JSON.parse(body) as { error?: { details?: unknown } } | null;
+    const details = payload?.error?.details;
+    return Array.isArray(details) && details.some((detail: unknown) => {
+      if (!detail || typeof detail !== 'object') return false;
+      const value = detail as Record<string, unknown>;
+      return value['@type'] === 'type.googleapis.com/google.firebase.fcm.v1.FcmError' && value['errorCode'] === expectedCode;
+    });
+  } catch { return false; }
+}
+
 export { firebasePushConfigured };
 export async function assertFirebasePushReady(): Promise<void> {
   const config = firebaseCredentials();
@@ -26,34 +41,39 @@ export async function pushTo(userIds: string[] | null, title: string, body: stri
   let sent = 0;
   for (const { token, user_id } of data ?? []) {
     if (disabledIds.has(user_id)) continue;
-    const response = await fetch('https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(creds.project_id) + '/messages:send', {
-      method: 'POST',
-      signal: AbortSignal.timeout(12000),
-      headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        message: {
-          token,
-          notification: { title, body },
-          webpush: {
-            fcm_options: { link: APP_URL },
-            notification: {
-              title, body, icon: APP_ICON, badge: APP_BADGE, lang: 'pt-BR',
-              silent: false, vibrate: [130, 70, 130],
-              ...(tag ? { tag, renotify: !tag.startsWith('online-') } : {}),
+    let response: Response;
+    try {
+      response = await fetch('https://fcm.googleapis.com/v1/projects/' + encodeURIComponent(creds.project_id) + '/messages:send', {
+        method: 'POST',
+        signal: AbortSignal.timeout(12000),
+        headers: { Authorization: 'Bearer ' + access, 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          message: {
+            token,
+            notification: { title, body },
+            webpush: {
+              fcm_options: { link: APP_URL },
+              notification: {
+                title, body, icon: APP_ICON, badge: APP_BADGE, lang: 'pt-BR',
+                silent: false, vibrate: [130, 70, 130],
+                ...(tag ? { tag, renotify: !tag.startsWith('online-') } : {}),
+              },
             },
           },
-        },
-      }),
-    });
+        }),
+      });
+    } catch { throw new Error('Falha temporária na conexão com o Firebase.'); }
     if (response.ok) { sent++; continue; }
     const text = await response.text();
-    if (response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500) {
+    const invalidToken = isPermanentFcmTokenFailure(response.status, text);
+    if (!invalidToken && (response.status === 401 || response.status === 403 || response.status === 429 || response.status >= 500)) {
       throw new Error('Falha temporária no envio Firebase (HTTP ' + response.status + ').');
     }
     // Don't log credentials, individual messages or sensitive device tokens.
     console.warn('[FCM] Push rejected: HTTP ' + response.status);
-    if (text.includes('UNREGISTERED') || text.includes('registration-token-not-registered')) {
-      await supabaseAdmin.from('push_tokens').delete().eq('token', token);
+    if (invalidToken) {
+      const { error: cleanupError } = await supabaseAdmin.from('push_tokens').delete().eq('token', token);
+      if (cleanupError) throw new Error('Não foi possível remover um aparelho expirado das notificações.');
     }
   }
   return sent;

@@ -96,7 +96,7 @@ export function Tutorial({ userId }: { userId: string }) {
   </DialogContent></Dialog>;
 }
 
-const pushMsg: Record<string, string> = { registered: 'Notificações ativadas! ♡', 'not-configured': 'Atualize a conexão Firebase e inclua notificações web.', unsupported: 'Este navegador não aceita notificações. No iPhone, adicione o Duet à Tela de Início.', 'open-in-new-tab': 'Abra o Duet numa aba própria para ativar.', denied: 'Permita notificações nas configurações do navegador.' };
+const pushMsg: Record<string, string> = { registered: 'Notificações ativadas! ♡', 'not-configured': 'As notificações deste aplicativo ainda precisam ser configuradas.', unsupported: 'Este aparelho não oferece suporte a estes avisos. No iPhone, use iOS 16.4 ou mais recente e abra o app pela Tela de Início.', 'install-required': 'No Safari, toque em Compartilhar → Adicionar à Tela de Início. Abra o Duet pelo novo ícone e ative os avisos.', 'open-in-new-tab': 'Abra o Duet numa aba própria para ativar.', denied: 'Permita notificações nas configurações deste aplicativo no aparelho.' };
 export function PushButton({ userId, hideTrigger = false }: { userId: string; hideTrigger?: boolean }) {
   const [open, setOpen] = useState(false);
   useEffect(() => {

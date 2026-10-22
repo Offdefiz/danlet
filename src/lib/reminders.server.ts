@@ -6,7 +6,7 @@ import { currentReminderSlot, reminderMessage } from '@/lib/push-copy';
 /**
  * Intended for an hourly (or more frequent) authenticated cron invocation.
  * Three daytime windows per day, with a durable unique marker in the existing
- * queue so retries and multiple scheduler workers cannot send duplicate nudges.
+ * queue so concurrent scheduler workers do not start the same reminder window.
  * Nothing depends on an open browser tab or requires a new database table.
  */
 export async function sendDueInspirations(now = new Date()) {
@@ -41,11 +41,11 @@ export async function sendDueInspirations(now = new Date()) {
     if (!inserted?.length) continue;
     try {
       sent += await pushTo([member.user_id], 'Duet ♡', body, `carinho-${slot.date}-${slot.id}`);
-    } catch (sendError) {
-      // Claim stays consumed; avoid hammering the provider or duplicate alerts.
-      // A per-user unique marker must not be consumed when the provider fails.
-      await supabaseAdmin.from('push_event_queue').delete().eq('id', id);
-      console.error('Falha ao enviar lembrete carinhoso do Duet', sendError);
+    } catch {
+      // Retrying after a partial multi-device delivery can repeat an alert.
+      const { error: releaseError } = await supabaseAdmin.from('push_event_queue').delete().eq('id', id);
+      console.error('Falha ao enviar lembrete carinhoso do Duet');
+      if (releaseError) throw new Error('Não foi possível liberar o lembrete para nova tentativa.');
     }
   }
   return { sent, slot: slot.id };

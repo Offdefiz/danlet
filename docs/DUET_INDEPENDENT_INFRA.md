@@ -7,7 +7,7 @@
 - **Músicas**: iTunes Search API diretamente, gratuita, sem cadastro e sem gateway Lovable. Resultados abrem no Apple Music; links do YouTube salvos anteriormente permanecem.
 - **Buscas de locais/Instagram**: Firecrawl REST direto **opcional**. Chave gerida pelo responsável pelo app em `FIRECRAWL_API_KEY` (Render); sem chave, escolha e cadastro manual continuam funcionando.
 - **Push**: Firebase Cloud Messaging (FCM) HTTP v1 direto, sem Lovable. O projeto Firebase e a conta de serviço precisam pertencer aos responsáveis pelo Duet.
-- **Cron**: GitHub Actions roda a cada hora, sob limites gratuitos aplicáveis, usando segredo compartilhado com o Render. Um cron pago não foi provisionado.
+- **Cron**: GitHub Actions está preparado para chamar os jobs a cada cinco minutos, sob limites gratuitos aplicáveis, usando segredo compartilhado com o Render. A ativação depende do repository secret; um cron pago não foi provisionado.
 - **Calendário**: agenda interna no Supabase e exportação Apple .ics/Google; não é sincronização bidirecional automática.
 - **Build**: TanStack Start + Vite + Nitro oficiais, sem o wrapper `@lovable.dev/vite-tanstack-config` e sem dependência de build do Lovable.
 
@@ -22,23 +22,29 @@ Em **Render → danlet → Environment**, confira as variáveis, sem compartilha
 | `VITE_SUPABASE_URL`, `VITE_SUPABASE_PUBLISHABLE_KEY` | Configuração pública compilada no frontend (já existe no código) |
 | `PUBLIC_APP_URL` | Opcional; por padrão usa `RENDER_EXTERNAL_URL` |
 | `FIRECRAWL_API_KEY` | Opcional: busca automática de inspirações e metadados |
-| `FIREBASE_SERVICE_ACCOUNT_JSON` | Opcional até Firebase próprio estar pronto; JSON integral da conta de serviço, **somente no Render** |
-| `LOVABLE_CRON_SECRET` | Segredo do cron existente; apesar do nome legado, não exige conta Lovable |
+| `FIREBASE_SERVICE_ACCOUNT_FILE` | Caminho do secret file no Render: `/etc/secrets/firebase-service-account.json` |
+| `FIREBASE_SERVICE_ACCOUNT_JSON` | Alternativa ao arquivo: JSON integral da conta de serviço, **somente no Render** |
+| `DUET_CRON_SECRET` | Segredo do cron; deve coincidir exatamente com o repository secret homônimo no GitHub |
+| `DUET_CRON_SECRET_PREVIOUS` | Opcional e temporário, para rotação do segredo de cron |
 
-Alternativa à conta Firebase em JSON: `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (salvas como segredo apenas no Render). Não defina os dois esquemas ao mesmo tempo.
+No Render, crie o secret file `firebase-service-account.json` e defina `FIREBASE_SERVICE_ACCOUNT_FILE=/etc/secrets/firebase-service-account.json`. Alternativas existentes: `FIREBASE_SERVICE_ACCOUNT_JSON` ou o conjunto `FIREBASE_PROJECT_ID`, `FIREBASE_CLIENT_EMAIL`, `FIREBASE_PRIVATE_KEY` (salvos como segredo somente no Render). Configure um único esquema; o servidor prioriza JSON em variável, depois arquivo e depois variáveis separadas. Não deixe credenciais incompletas ou de outro projeto em um esquema de maior prioridade.
 
 ### Criar Firebase próprio
 
 1. Acesse o console Firebase com a conta administradora do app e crie/selecione um projeto próprio. Habilite o Cloud Messaging (API HTTP v1).
-2. Adicione um aplicativo **Web**, gere ou registre a chave Web Push VAPID em Cloud Messaging, e copie **somente a configuração pública** do cliente Web para as variáveis de **build** no Render:
+2. Adicione um aplicativo **Web** no mesmo projeto da conta de serviço, gere ou registre a chave Web Push VAPID desse projeto em Cloud Messaging, e copie **somente a configuração pública** do cliente Web para as cinco variáveis de **build** no Render:
    `VITE_FIREBASE_APP_ID`, `VITE_FIREBASE_API_KEY`, `VITE_FIREBASE_PROJECT_ID`, `VITE_FIREBASE_MESSAGING_SENDER_ID`, `VITE_FIREBASE_VAPID_KEY`.
-3. Gere uma conta de serviço com permissão de envio de mensagens Cloud Messaging e armazene o JSON como `FIREBASE_SERVICE_ACCOUNT_JSON` no Render. **Nunca coloque JSON, chave privada, SERVICE_ROLE ou token no GitHub nem nas variáveis `VITE_*`.**
-4. Após deploy, abra o PWA no iPhone de Daniel e no de Letícia a partir de **https://danlet.onrender.com**, permita notificações pelo ícone instalado e execute nova inscrição. Tokens FCM pertencem ao projeto Firebase antigo e não migram automaticamente.
-5. Teste as permissões no iOS, a fila de mensagens com ambas as contas e o acionamento horário. Até isso ser concluído, os lembretes só ficam preparados no código, **não há garantia de envio**.
+3. Gere uma conta de serviço com permissão de envio de mensagens Cloud Messaging e salve-a como secret file conforme acima. **Nunca coloque JSON, chave privada, SERVICE_ROLE ou token no GitHub nem nas variáveis `VITE_*`.**
+4. Faça **novo build e deploy** após qualquer alteração nos cinco campos `VITE_FIREBASE_*`. Reiniciar o servidor não atualiza os valores já compilados no frontend. Abra o PWA no iPhone de Daniel e no de Letícia a partir de **https://danlet.onrender.com**, usando iOS/iPadOS **16.4 ou superior** e **Compartilhar → Adicionar à Tela de Início**. Abra pelo ícone instalado e toque no botão de ativar notificações para conceder a permissão. Tokens FCM pertencem ao projeto Firebase antigo e não migram automaticamente; cada aparelho precisa ser reinscrito.
+5. Teste as permissões no iOS, a fila de mensagens com ambas as contas e o acionamento agendado. Até isso ser concluído, os lembretes só ficam preparados no código, **não há garantia de envio**. O passo a passo e os diagnósticos estão em [DUET_RENDER_NOTIFICATIONS.md](./DUET_RENDER_NOTIFICATIONS.md).
 
 ### Cron no GitHub
 
-Em **Settings → Secrets and variables → Actions** do repositório, cadastre `DUET_CRON_SECRET` com o MESMO valor que `LOVABLE_CRON_SECRET` no Render. O workflow `Duet notifications scheduler` chama os dois jobs a cada hora. Um cron agendado pode sofrer atraso pelo GitHub e um servidor Render Free pode sofrer cold-start.
+Em **Settings → Secrets and variables → Actions** do repositório, cadastre o repository secret `DUET_CRON_SECRET` com o MESMO valor que `DUET_CRON_SECRET` no Render. Essa configuração permanece pendente: a integração atual retorna HTTP 403 ao tentar administrar secrets/variables, portanto quem administra o repositório precisa concluí-la pela interface. O workflow registra **Pending setup** quando o segredo está ausente e não chama os endpoints.
+
+O servidor mantém compatibilidade com `LOVABLE_CRON_SECRET`/`LOVABLE_CRON_SECRET_PREVIOUS` somente se `DUET_CRON_SECRET` não estiver configurado. Após a migração, use `DUET_CRON_SECRET_PREVIOUS` para rotação; os nomes legados deixam de autorizar chamadas e não exigem uma conta Lovable.
+
+O workflow `Duet notifications scheduler` chama os dois jobs a cada cinco minutos (`2-59/5 * * * *`, UTC), com concurrency e sem permissões de leitura/escrita ao repositório. O intervalo anterior de uma hora excedia o prazo de dez minutos dos eventos na fila existente. Os lembretes diurnos continuam limitados a três por dia pelas chaves idempotentes. Um agendamento pode atrasar ou não rodar pelo GitHub e um servidor Render Free pode sofrer cold-start; portanto nem o prazo nem a entrega no celular são garantidos. Nenhum serviço pago foi criado e nenhuma tabela ou dado existente precisa ser migrado para este ajuste.
 
 ## Custos e decisão sobre o banco
 

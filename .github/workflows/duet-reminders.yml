@@ -2,11 +2,14 @@ name: Duet notifications scheduler
 
 on:
   schedule:
-    - cron: '17 * * * *'
+    - cron: '2-59/5 * * * *'
   workflow_dispatch:
 
-permissions:
-  contents: read
+permissions: {}
+
+concurrency:
+  group: duet-notifications-scheduler
+  cancel-in-progress: false
 
 jobs:
   notify:
@@ -20,14 +23,15 @@ jobs:
         run: |
           set -euo pipefail
           if [ -z "${DUET_CRON_SECRET}" ]; then
-            echo "DUET_CRON_SECRET is not configured: no notifications will be sent."
+            echo "::warning::Pending setup: DUET_CRON_SECRET is not configured; notifications were not requested."
+            printf '%s\n' 'Pending setup: add the DUET_CRON_SECRET repository secret with the same value configured on Render. No notifications were requested.' >> "$GITHUB_STEP_SUMMARY"
             exit 0
           fi
           endpoint="${DUET_CRON_ENDPOINT:-https://danlet.onrender.com}"
           for route in partner-notifications inspire; do
             echo "Requesting ${route} (response omitted to avoid exposing private data)"
-            curl --fail --silent --show-error --retry 2 --retry-delay 4 \
-              --connect-timeout 15 --max-time 135 \
+            curl --proto '=https' --fail --silent --show-error --retry 1 --retry-delay 4 \
+              --connect-timeout 15 --max-time 90 \
               -X POST -H "Authorization: Bearer ${DUET_CRON_SECRET}" \
               -H "Content-Type: application/json" \
               -o /dev/null "${endpoint%/}/api/public/jobs/${route}"
