@@ -1,6 +1,9 @@
 name: Duet notifications scheduler
 
 on:
+  push:
+    branches: [main]
+    paths: ['.github/workflows/duet-reminders.yml']
   schedule:
     # Every 20 minutes, 09:07-21:47 America/Sao_Paulo (UTC-3).
     # GitHub may delay scheduled jobs; the server verifies local quiet hours.
