@@ -28,14 +28,23 @@ export function DuetQuestions({ records, members, userId, onSaved }: Props) {
   }
 
   useEffect(() => {
-    const link = parseQuestionLink(window.location.search);
-    if (link) choose(link.id, link.date);
+    const checkLink = () => {
+      const link = parseQuestionLink(window.location.search);
+      if (link) choose(link.id, link.date);
+    };
+    checkLink();
+    window.addEventListener('focus', checkLink);
+    window.addEventListener('popstate', checkLink);
     const onOpen = (event: Event) => {
       const detail = (event as CustomEvent<{ id: QuestionId; date?: string }>).detail;
       if (detail?.id) choose(detail.id, detail.date);
     };
     window.addEventListener('duet:open-question', onOpen);
-    return () => window.removeEventListener('duet:open-question', onOpen);
+    return () => {
+      window.removeEventListener('duet:open-question', onOpen);
+      window.removeEventListener('focus', checkLink);
+      window.removeEventListener('popstate', checkLink);
+    };
     // Run once on mount; changes to answers are reflected when selecting a card.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
