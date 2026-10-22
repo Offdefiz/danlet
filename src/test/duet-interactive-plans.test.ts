@@ -20,9 +20,9 @@ describe('Duet interactive plans', () => {
     expect(entry.kind).toBe('setting');
     expect(entry.title).toContain('Agenda: Jantar de sexta');
     const details = JSON.parse(entry.body) as Record<string,string>;
-    expect(details.date).toBe('2026-10-23');
-    expect(details.notes).toBe('Pizza na sexta');
-    expect(details.location).toBe('');
+    expect(details['date']).toBe('2026-10-23');
+    expect(details['notes']).toBe('Pizza na sexta');
+    expect(details['location']).toBe('');
   });
   it('does not create a calendar plan without an answer', () => {
     expect(() => makeAnswerRecord({questionId:'friday',date:'2026-10-23',time:'19:30',answer:'  ',by:'abc'})).toThrow();
