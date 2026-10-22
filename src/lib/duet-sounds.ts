@@ -1,5 +1,5 @@
 /** Short, optional UI sounds. No external audio service, download or tracking. */
-export type DuetSound = 'match' | 'notification' | 'success';
+export type DuetSound = 'match' | 'notification' | 'success' | 'welcome' | 'question';
 const key = (userId: string) => `duet:sounds:${userId}`;
 export function soundsEnabled(userId: string): boolean {
   if (typeof window === 'undefined') return true;
