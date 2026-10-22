@@ -6,11 +6,11 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { supabase } from '@/integrations/supabase/client';
-import { AGENDA_PREFIX, calendarIcs, decodeCalendarRecord, googleCalendarLink, isCalendarRecord, type CoupleEvent } from '@/lib/duet-calendar';
+import { AGENDA_PREFIX, brazilianToday, calendarIcs, decodeCalendarRecord, googleCalendarLink, isCalendarRecord, type CoupleEvent } from '@/lib/duet-calendar';
 import type { Row } from '@/lib/duet.types';
 import { playDuetSound } from '@/lib/duet-sounds';
 
-const blank = (): CoupleEvent => ({ title: '', date: new Date().toISOString().slice(0, 10), time: '09:00', notes: '', location: '' });
+const blank = (): CoupleEvent => ({ title: '', date: brazilianToday(), time: '09:00', notes: '', location: '' });
 export function DuetCalendar({ userId, records, onSaved }: { userId: string; records: Row<'records'>[]; onSaved: () => Promise<unknown> }) {
   const [open, setOpen] = useState(false);
   const [entry, setEntry] = useState<CoupleEvent>(blank);
