@@ -54,8 +54,16 @@ export async function verifyDuetSchedulerIdentity(token: string, now = Math.floo
   try {
     const keys = await signingKeys();
     const key = keys.find(k => k.kid === header['kid'] && k.kty === 'RSA' && (k.use === undefined || k.use === 'sig') && (k.alg === undefined || k.alg === 'RS256'));
-    if (!key) return false;
+    if (!key) {
+      console.warn('[Duet scheduler] Public signing key not found.');
+      return false;
+    }
     const publicKey = createPublicKey({ key: key as Parameters<typeof createPublicKey>[0] & Json, format: 'jwk' });
-    return verify('RSA-SHA256', Buffer.from(headerText + '.' + payloadText), publicKey, Buffer.from(signatureText, 'base64url'));
-  } catch { return false; }
+    const accepted = verify('RSA-SHA256', Buffer.from(headerText + '.' + payloadText), publicKey, Buffer.from(signatureText, 'base64url'));
+    if (!accepted) console.warn('[Duet scheduler] Invalid signature.');
+    return accepted;
+  } catch {
+    console.warn('[Duet scheduler] Unable to load public signing keys or verify signature.');
+    return false;
+  }
 }
