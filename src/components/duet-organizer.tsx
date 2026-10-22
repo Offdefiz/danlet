@@ -63,7 +63,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const triedPhotos = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   useEffect(() => {
-    if (parseQuestionLink(window.location.search)) setTab('together');
+    if (parseQuestionLink(window.location.search) || window.location.search.includes('duet_checkin=water') || window.location.search.includes('duet_view=together')) setTab('together');
     const handle = () => setTab('together');
     window.addEventListener('duet:open-question', handle);
     return () => window.removeEventListener('duet:open-question', handle);
