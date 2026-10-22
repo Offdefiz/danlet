@@ -1,36 +1,42 @@
-/** Short, optional UI sounds. No external audio service, download or tracking. */
+/** Tiny, optional sounds synthesized on-device; no remote audio files. */
 export type DuetSound = 'match' | 'notification' | 'success' | 'welcome' | 'question';
-const key = (userId: string) => `duet:sounds:${userId}`;
-export function soundsEnabled(userId: string): boolean {
+const key = (id: string) => 'duet:sounds:' + id;
+let context: AudioContext | null = null;
+export function soundsEnabled(id: string): boolean {
   if (typeof window === 'undefined') return true;
-  try { return window.localStorage.getItem(key(userId)) !== 'off'; } catch { return false; }
+  try { return localStorage.getItem(key(id)) !== 'off'; } catch { return false; }
 }
-export function setSoundsEnabled(userId: string, enabled: boolean) {
-  try { window.localStorage.setItem(key(userId), enabled ? 'on' : 'off'); } catch { /* private mode */ }
+export function setSoundsEnabled(id: string, enabled: boolean) {
+  try { localStorage.setItem(key(id), enabled ? 'on' : 'off'); } catch { /* disabled */ }
 }
+const melodies: Record<DuetSound, number[]> = {
+  match: [523.25,659.25,783.99,1046.5],
+  notification: [659.25,783.99],
+  success: [523.25,659.25],
+  welcome: [392,523.25,659.25],
+  question: [523.25,622.25],
+};
 export function playDuetSound(type: DuetSound, userId: string) {
-  if (typeof window === 'undefined' || !soundsEnabled(userId) || document.visibilityState !== 'visible') return;
+  if (typeof window === 'undefined' || document.visibilityState !== 'visible' || !soundsEnabled(userId)) return;
   try {
-    const AudioContextClass = window.AudioContext;
-    if (!AudioContextClass) return;
-    const ctx = new AudioContextClass();
-    // iOS requires user interaction before an AudioContext can play.
-    if (ctx.state === 'suspended') { void ctx.close(); return; }
-    const notes = type === 'match' ? [523.25, 659.25, 783.99] : type === 'notification' ? [659.25, 783.99] : [523.25, 659.25];
-    notes.forEach((freq, i) => {
-      const oscillator = ctx.createOscillator();
-      const envelope = ctx.createGain();
-      const start = ctx.currentTime + i * .11;
-      oscillator.type = 'sine';
-      oscillator.frequency.value = freq;
-      envelope.gain.setValueAtTime(0.0001, start);
-      envelope.gain.exponentialRampToValueAtTime(.028, start + .014);
-      envelope.gain.exponentialRampToValueAtTime(.0001, start + .24);
-      oscillator.connect(envelope);
-      envelope.connect(ctx.destination);
-      oscillator.start(start);
-      oscillator.stop(start + .245);
-    });
-    window.setTimeout(() => { void ctx.close().catch(() => {}); }, notes.length * 110 + 500);
-  } catch { /* Browser/device sound capability unavailable; do not interrupt user flow. */ }
+    if (!window.AudioContext) return;
+    if (!context || context.state === 'closed') context = new AudioContext();
+    const audio = context;
+    const schedule = () => {
+      melodies[type].forEach((freq, index) => {
+        const start = audio.currentTime + index * 0.12;
+        const tone = audio.createOscillator(), gain = audio.createGain();
+        tone.type = 'sine'; tone.frequency.setValueAtTime(freq, start);
+        gain.gain.setValueAtTime(0.0001, start);
+        gain.gain.exponentialRampToValueAtTime(0.03, start + 0.015);
+        gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.23);
+        tone.connect(gain); gain.connect(audio.destination);
+        tone.start(start); tone.stop(start + 0.24);
+      });
+    };
+    // On iPhone, this resumes only after a real user gesture. Background
+    // notifications must use OS sounds, never an attempted autoplay hack.
+    if (audio.state === 'suspended') { void audio.resume().then(schedule).catch(() => {}); }
+    else schedule();
+  } catch { /* device preference takes precedence over decoration */ }
 }
