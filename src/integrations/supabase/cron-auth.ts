@@ -9,10 +9,6 @@ export async function authenticateCronRequest(
     ? process.env['DUET_CRON_SECRET_PREVIOUS']
     : process.env['LOVABLE_CRON_SECRET_PREVIOUS']
 
-  if (!currentSecret) {
-    return new Response('Server configuration error', { status: 500 })
-  }
-
   const match = /^Bearer ([^\s,]+)$/.exec(
     request.headers.get('authorization') ?? '',
   )
@@ -21,6 +17,14 @@ export async function authenticateCronRequest(
     return new Response('Unauthorized', { status: 401 })
   }
 
+  if (token.split('.').length === 3) {
+    const { verifyDuetSchedulerIdentity } = await import('@/lib/github-oidc.server')
+    return await verifyDuetSchedulerIdentity(token)
+      ? null
+      : new Response('Unauthorized', { status: 401 })
+  }
+
+  if (!currentSecret) return new Response('Unauthorized', { status: 401 })
   const { createHash, timingSafeEqual } = await import('node:crypto')
   const digest = (value: string) =>
     createHash('sha256').update(value, 'utf8').digest()

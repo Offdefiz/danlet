@@ -19,9 +19,33 @@ Quando a pessoa escolhe **Ainda não sei**, **Sem planos ainda**, ou responde **
 ## Push com destino
 O envio via Firebase passa um link HTTPS restrito ao domínio do próprio app. O clique na pergunta da sexta/sábado/domingo abre `/?duet_question=<id>&date=<YYYY-MM-DD>`; o check-in de água abre `/?duet_checkin=water`. O PWA reavalia esses links ao iniciar e ao recuperar foco.
 
-Os quatro horários locais de São Paulo são **9h–11h, 12h–14h, 15h–17h, 19h–21h**, com no máximo um aviso por usuário/janela. A implementação usa o mesmo registro de idempotência já existente, respeita preferências de push e não envia notificações de madrugada. O cron do GitHub consulta a cada hora, e os horários exatos podem atrasar.
+## Surpresas, cadência e resposta
 
-**ATENÇÃO**: os alertas externos só chegam se `DUET_CRON_SECRET` no GitHub, `LOVABLE_CRON_SECRET` no Render, `SUPABASE_SERVICE_ROLE_KEY` e conta Firebase/FCM real estiverem configurados. O uso do nome legado da variável não cria uma dependência do Lovable. O GitHub Actions pode terminar em verde mesmo quando ignorar o envio por falta do segredo. Não considerar integração de push real validada sem um teste entre os dois aparelhos.
+Além das perguntas da aba Juntos, o Duet tem uma coleção de **37 mensagens leves, fofas e engraçadinhas**. O texto é pré-escrito, muda por dia e por usuário e **não precisa de geração por IA nem registra tarefas**. Exemplo: “Boletim do Duet: hoje vale mandar um oi só porque sim.”
+
+O GitHub Actions verifica o servidor a cada **20 minutos**, entre aproximadamente **9h e 22h em São Paulo**; o Render usa idempotência no banco para limitar os avisos proativos a **até cinco por dia por pessoa**. Este não é um limite para mensagens reais, matches ou atualizações do casal. O envio evita surpresas desnecessárias quando alguém esteve usando o aplicativo nos últimos 25 minutos. Não há avisos proativos de madrugada, e cada pessoa pode desligar notificações nas preferências.
+
+Janelas para surpresa: **9h–11h, 12h–14h, 15h–17h, 18h–20h, 21h–22h**, horário de São Paulo. Não há garantia de minuto exato porque agendamentos do GitHub podem atrasar ou ser ignorados em picos de carga.
+
+Planejamento: começa **quarta à noite** com uma proposta para sábado, **quinta/sexta pela manhã** sobre jantar, e continua sábado e domingo; sugestões já respondidas pela pessoa são substituídas por surpresas, evitando cobranças repetidas. Pergunta sobre água aparece em determinados almoços e a resposta rápida é enviada ao chat, não à agenda. Quando a resposta é um dos formatos rápidos conhecidos, a notificação enviada ao par pode apresentar uma frase contextual sem expor o texto de conversas comuns.
+
+## Segurança do agendador e configuração
+
+O servidor aceita **GitHub Actions OIDC** com JWT de curta duração assinado pelo GitHub, validando assinatura RSA, audiência exata, repositório, branch principal, arquivo do workflow e validade. **Não é necessário cadastrar `DUET_CRON_SECRET` no GitHub nem copiar qualquer senha do Render.** O código antigo com segredos permanece como compatibilidade temporária.
+
+O GitHub chama `/api/public/jobs/status` (POST autenticado) para confirmar, sem revelar segredos:
+- `supabaseAdminConfigured`: se `SUPABASE_URL` e `SUPABASE_SERVICE_ROLE_KEY` estão presentes no Render;
+- `supabaseReachable`: se a API Supabase permite consultar a tabela de tokens;
+- `firebaseConfigured` e `firebaseAuthenticated`: conta de serviço Firebase definida e OAuth válido;
+- `registeredDevices`: quantidade de inscrições, sem listar ou expor tokens.
+
+**Mesmo que o Firebase tenha sido configurado no console, ele não envia ao PWA sozinho.** O Render precisa da credencial privada de envio FCM (em `FIREBASE_SERVICE_ACCOUNT_JSON` ou arquivo secreto equivalente) e de `SUPABASE_SERVICE_ROLE_KEY`. A configuração web `VITE_FIREBASE_*` e a inscrição Push também precisam estar completas.
+
+### Último passo em cada iPhone (quando o servidor estiver pronto)
+
+Abra `https://danlet.onrender.com` no Safari, escolha **Compartilhar → Adicionar à Tela de Início**, abra o ícone instalado, entre com a conta individual, acesse as preferências de notificações e toque para ativar o push. Aceite a permissão do iOS. Daniel e Letícia devem fazer isso **uma vez em cada iPhone**. Se o projeto Firebase mudou, reinscrever-se pode ser necessário.
+
+**Limite da validação**: a verificação de status prova que os provedores estão configurados e que existem aparelhos registrados, mas não certifica que a notificação apareceu no iPhone de cada pessoa. Somente um teste com os dois dispositivos consegue confirmar isso.
 
 ## Checklist após deploy
 1. Login das duas contas e barra inferior sem perda de Planos/Lista/Adicionar.

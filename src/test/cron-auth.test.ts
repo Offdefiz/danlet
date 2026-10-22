@@ -68,8 +68,8 @@ describe('cron request authentication', () => {
     vi.stubEnv('DUET_CRON_SECRET_PREVIOUS', 'test-duet-previous');
 
     const response = await authenticateCronRequest(request('Bearer test-duet-previous'));
-    expect(response?.status).toBe(500);
-    expect(await response?.text()).toBe('Server configuration error');
+    expect(response?.status).toBe(401);
+    expect(await response?.text()).toBe('Unauthorized');
   });
 
   it.each([
