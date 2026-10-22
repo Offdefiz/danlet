@@ -130,7 +130,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     else if (liked && partnerVote(data?.votes ?? [], ref.id, userId)?.liked) {
       playDuetSound('match', userId);
       toast.success(`Match! Você e ${partnerName} curtiram ${ref.title}. ♡`);
-    }
+    } else if (saved) playDuetSound(liked ? 'success' : 'question', userId);
   }
   async function sign(record: Row<'records'>) {
     if (await mutate(() => supabase.from('signatures').insert({ record_id: record.id, user_id: userId }))) { playDuetSound('success', userId); toast.success('Sua assinatura foi salva.'); }
