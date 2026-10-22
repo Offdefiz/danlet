@@ -5,6 +5,11 @@ import { firebaseAccessToken, firebaseCredentials, firebasePushConfigured } from
 const APP_URL = new URL('/', process.env['PUBLIC_APP_URL'] || process.env['RENDER_EXTERNAL_URL'] || 'https://danlet.onrender.com').href;
 const APP_ICON = new URL('icons/duet-192.png', APP_URL).href;
 const APP_BADGE = new URL('icons/duet-badge.png', APP_URL).href;
+function safeDestination(destination?: string) {
+  if (!destination || !destination.startsWith('/?')) return APP_URL;
+  const url = new URL(destination, APP_URL);
+  return url.origin === new URL(APP_URL).origin ? url.href : APP_URL;
+}
 
 function isPermanentFcmTokenFailure(status: number, body: string): boolean {
   const expectedCode = status === 403 ? 'SENDER_ID_MISMATCH' : status === 404 ? 'UNREGISTERED' : null;
@@ -27,7 +32,7 @@ export async function assertFirebasePushReady(): Promise<void> {
   await firebaseAccessToken(config);
 }
 
-export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string) {
+export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string, destination?: string) {
   const creds = firebaseCredentials();
   if (!firebasePushConfigured() || !creds) throw new Error('Notificações push pendentes: configure a conta de serviço Firebase no Render.');
   const access = await firebaseAccessToken(creds);
@@ -52,7 +57,7 @@ export async function pushTo(userIds: string[] | null, title: string, body: stri
             token,
             notification: { title, body },
             webpush: {
-              fcm_options: { link: APP_URL },
+              fcm_options: { link: safeDestination(destination) },
               notification: {
                 title, body, icon: APP_ICON, badge: APP_BADGE, lang: 'pt-BR',
                 silent: false, vibrate: [130, 70, 130],

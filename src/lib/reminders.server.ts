@@ -2,10 +2,11 @@ import { createHash } from 'node:crypto';
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { pushTo, firebasePushConfigured, assertFirebasePushReady } from '@/lib/push.server';
 import { currentReminderSlot, reminderMessage } from '@/lib/push-copy';
+import { dueQuestion, makeQuestionLink, questions } from '@/lib/weekend-prompts';
 
 /**
  * Intended for an hourly (or more frequent) authenticated cron invocation.
- * Three daytime windows per day, with a durable unique marker in the existing
+ * Four daytime windows per day, with a durable unique marker in the existing
  * queue so concurrent scheduler workers do not start the same reminder window.
  * Nothing depends on an open browser tab or requires a new database table.
  */
@@ -21,7 +22,16 @@ export async function sendDueInspirations(now = new Date()) {
     .select('user_id').eq('enabled', false);
   if (preferenceError) throw preferenceError;
   const optedOut = new Set((disabled ?? []).map(row => row.user_id));
-  const body = reminderMessage(slot.date, slot.id);
+  const sundayEvening = new Date(slot.date + 'T12:00:00Z').getUTCDay() === 0 && slot.id === 'noite';
+  const prompt = sundayEvening ? { id: 'remember' as const, date: slot.date } : slot.id === 'cafe' ? dueQuestion(now) : null;
+  const selected = prompt ? questions.find(q => q.id === prompt.id) : null;
+  const body = selected ? selected.title
+    : slot.id === 'almoco' ? 'Já bebeu água hoje? Responde pra gente! 💧'
+    : slot.id === 'tarde' ? 'Como está seu dia? Que tal dar notícias ao seu par? 💌'
+    : reminderMessage(slot.date, slot.id);
+  const destination = prompt ? makeQuestionLink(prompt.id, prompt.date)
+    : slot.id === 'almoco' ? '/?duet_checkin=water'
+    : '/?duet_view=together';
   let sent = 0;
   for (const member of members ?? []) {
     if (optedOut.has(member.user_id)) continue;
@@ -40,7 +50,7 @@ export async function sendDueInspirations(now = new Date()) {
     if (insertError) throw insertError;
     if (!inserted?.length) continue;
     try {
-      sent += await pushTo([member.user_id], 'Duet ♡', body, `carinho-${slot.date}-${slot.id}`);
+      sent += await pushTo([member.user_id], 'Duet ♡', body, `carinho-${slot.date}-${slot.id}`, destination);
     } catch {
       // Retrying after a partial multi-device delivery can repeat an alert.
       const { error: releaseError } = await supabaseAdmin.from('push_event_queue').delete().eq('id', id);

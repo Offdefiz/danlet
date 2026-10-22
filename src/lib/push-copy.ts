@@ -24,12 +24,13 @@ export const sweetReminders = [
 ] as const;
 
 export const reminderSlots = [
-  { id: 'manha', startHour: 9, endHour: 12 },
-  { id: 'tarde', startHour: 13, endHour: 16 },
-  { id: 'noite', startHour: 18, endHour: 21 },
+  { id: 'cafe', startHour: 9, endHour: 11 },
+  { id: 'almoco', startHour: 12, endHour: 14 },
+  { id: 'tarde', startHour: 15, endHour: 17 },
+  { id: 'noite', startHour: 19, endHour: 21 },
 ] as const;
 
-/** Up to three gentle reminders/day, never overnight (America/Sao_Paulo). */
+/** Up to four opt-out reminders/day, never overnight (America/Sao_Paulo). */
 export function currentReminderSlot(now: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo',

@@ -26,7 +26,7 @@ function activityNotice(event: Row<'activity'>, person: string): Notice {
     : kind === 'profiles' ? `${person} atualizou a foto ou o perfil.`
     : kind === 'records' ? `${person} ${event.action === 'DELETE' ? 'removeu' : event.action === 'INSERT' ? 'adicionou' : 'atualizou'} ${label || 'um plano'}.`
     : `${person} fez uma atualização no Duet.`;
-  return { id: `a-${event.id}`, timestamp: event.created_at, text, tab: kind === 'votes' || kind === 'references_catalog' ? 'dream' : kind === 'signatures' ? 'plans' : 'list', icon: kind === 'votes' ? 'heart' : 'calendar' };
+  return { id: `a-${event.id}`, timestamp: event.created_at, text, tab: kind === 'votes' || kind === 'references_catalog' ? 'dream' : kind === 'signatures' ? 'plans' : label.startsWith('Agenda: ') ? 'together' : 'list', icon: kind === 'votes' ? 'heart' : 'calendar' };
 }
 
 export function DuetNotificationCenter({ userId, activity, messages, members, onNavigate }: Props) {
@@ -41,7 +41,7 @@ export function DuetNotificationCenter({ userId, activity, messages, members, on
         .map(item => activityNotice(item, person(item.actor_id ?? ''))),
       ...messages.filter(item => item.user_id !== userId).map(item => ({
         id: `m-${item.id}`, timestamp: item.created_at,
-        text: `${person(item.user_id)} te mandou uma mensagem 💌`,
+        text: item.body.startsWith('Já bebeu água hoje? — ') ? `${person(item.user_id)} respondeu: ${item.body.slice(21, 80)} 💧` : item.body.includes(' — Ainda não sei') || item.body.includes(' — Nada planejado') ? `${person(item.user_id)} ainda está decidindo um plano ♡` : `${person(item.user_id)} te mandou uma mensagem 💌`,
         tab: 'chat' as const, icon: 'message' as const,
       })),
     ].sort((a, b) => b.timestamp.localeCompare(a.timestamp)).slice(0, 60);
