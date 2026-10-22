@@ -1,5 +1,7 @@
 /** Direct Firecrawl API: no Lovable connector, tokens or platform gateway. */
 const API = 'https://api.firecrawl.dev/v2';
+// Public search queries only; each cache hit avoids a billable Firecrawl search.
+const searchCache = new Map<string, { expiresAt: number; results: SearchHit[] }>();
 export type SearchHit = { title: string; url: string; description?: string };
 type SearchPayload = { success?: boolean; data?: { web?: SearchHit[] } | SearchHit[] };
 type ScrapePayload = { success?: boolean; data?: { metadata?: Record<string, unknown> }; metadata?: Record<string, unknown> };
@@ -35,10 +37,18 @@ async function api(path: '/search' | '/scrape', data: object): Promise<unknown> 
   } finally { clearTimeout(timer); }
 }
 export async function searchWeb(query: string, limit = 8): Promise<SearchHit[]> {
+  const cacheKey = JSON.stringify([query.trim().toLowerCase(), limit]);
+  const cached = searchCache.get(cacheKey);
+  if (cached && Date.now() < cached.expiresAt && process.env['FIRECRAWL_API_KEY']) {
+    return cached.results.map(item => ({ ...item }));
+  }
   const result = await api('/search', { query, limit, sources: [{ type: 'web' }], country: 'BR' }) as SearchPayload;
   const entries = Array.isArray(result.data) ? result.data : result.data?.web ?? [];
-  return entries.filter(v => typeof v?.title === 'string' && typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
+  const results = entries.filter(v => typeof v?.title === 'string' && typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
     .slice(0, limit).map(v => ({ title: v.title, url: v.url, description: v.description ?? '' }));
+  if (searchCache.size >= 100) searchCache.delete(searchCache.keys().next().value ?? '');
+  searchCache.set(cacheKey, { expiresAt: Date.now() + 15 * 60_000, results });
+  return results.map(item => ({ ...item }));
 }
 export async function scrapeWebMeta(url: string): Promise<{ title: string; description: string; image: string }> {
   if (!isPublicHttpsUrl(url)) throw new Error('Endereço de página inválido.');
