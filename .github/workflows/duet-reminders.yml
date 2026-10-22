@@ -39,7 +39,14 @@ jobs:
             exit 1
           fi
           endpoint='https://danlet.onrender.com'
-          for route in status partner-notifications inspire; do
+          # A new workflow version verifies OIDC immediately on merge, but
+          # does not send surprise notifications simply because code changed.
+          if [[ "$GITHUB_EVENT_NAME" == "push" ]]; then
+            routes=(status)
+          else
+            routes=(status partner-notifications inspire)
+          fi
+          for route in "${routes[@]}"; do
             echo "Calling Duet ${route}"
             result="${RUNNER_TEMP}/duet-${route}.json"
             code=$(curl --proto '=https' --silent --show-error \
