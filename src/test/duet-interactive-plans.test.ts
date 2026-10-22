@@ -27,11 +27,12 @@ describe('Duet interactive plans', () => {
   it('does not create a calendar plan without an answer', () => {
     expect(() => makeAnswerRecord({questionId:'friday',date:'2026-10-23',time:'19:30',answer:'  ',by:'abc'})).toThrow();
   });
-  it('provides four daytime windows without night alerts', () => {
+  it('provides five daytime windows without night alerts', () => {
     expect(currentReminderSlot(new Date('2026-10-22T12:00:00Z'))?.id).toBe('cafe');
     expect(currentReminderSlot(new Date('2026-10-22T15:00:00Z'))?.id).toBe('almoco');
     expect(currentReminderSlot(new Date('2026-10-22T18:00:00Z'))?.id).toBe('tarde');
-    expect(currentReminderSlot(new Date('2026-10-22T22:00:00Z'))?.id).toBe('noite');
+    expect(currentReminderSlot(new Date('2026-10-22T22:00:00Z'))?.id).toBe('fim-dia');
+    expect(currentReminderSlot(new Date('2026-10-23T00:30:00Z'))?.id).toBe('noite');
     expect(currentReminderSlot(new Date('2026-10-23T02:00:00Z'))).toBeNull();
     expect(questions).toHaveLength(4);
   });
