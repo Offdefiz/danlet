@@ -1,6 +1,6 @@
 import { CalendarDays, HeartHandshake, ListTodo, Sparkles, ArrowRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { decodeCalendarRecord, isCalendarRecord } from '@/lib/duet-calendar';
+import { brazilianToday, decodeCalendarRecord, isCalendarRecord } from '@/lib/duet-calendar';
 import { isMatch, type Row, type Tab } from '@/lib/duet.types';
 
 type Props = {
@@ -10,12 +10,6 @@ type Props = {
   userId: string;
   onNavigate: (tab: Tab) => void;
 };
-export function brazilianToday(now = new Date()) {
-  const parts = new Intl.DateTimeFormat('en-US', { timeZone: 'America/Sao_Paulo',
-    day: '2-digit', month: '2-digit', year: 'numeric' }).formatToParts(now);
-  const get = (type: string) => parts.find(p => p.type === type)?.value || '';
-  return get('year') + '-' + get('month') + '-' + get('day');
-}
 export function DuetHighlights({ records, references, votes, userId, onNavigate }: Props) {
   const openTasks = records.filter(r => r.kind === 'task' && !r.done);
   const matches = references.filter(r => isMatch(votes, r.id));
