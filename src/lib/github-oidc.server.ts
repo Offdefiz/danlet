@@ -49,7 +49,7 @@ export async function verifyDuetSchedulerIdentity(token: string, now = Math.floo
     || payload['repository'] !== REPO
     || payload['ref'] !== 'refs/heads/main'
     || payload['workflow_ref'] !== WORKFLOW
-    || payload['sub'] !== 'repo:' + REPO + ':ref:refs/heads/main'
+    || typeof payload['sub'] !== 'string' || !payload['sub'] || payload['sub'].length > 1024
     || (payload['event_name'] !== 'schedule' && payload['event_name'] !== 'workflow_dispatch' && payload['event_name'] !== 'push')) return false;
   try {
     const keys = await signingKeys();
