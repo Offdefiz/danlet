@@ -35,6 +35,8 @@ beforeEach(() => {
   boundary.from.mockImplementation((table: string) => {
     if (table === 'couple_members') return { select: members };
     if (table === 'notification_preferences') return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+    if (table === 'records') return { select: () => ({ eq: () => ({ limit: async () => ({ data: [], error: null }) }) }) };
+    if (table === 'duet_presence') return { select: () => ({ gte: async () => ({ data: [], error: null }) }) };
     if (table === 'push_event_queue') return {
       update: () => ({ eq: release }),
       delete: () => ({ eq: removeMarker }),
