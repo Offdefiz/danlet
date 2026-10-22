@@ -17,9 +17,21 @@ export function decodeCalendarRecord(record: Row<'records'>): CoupleEvent | null
     return { title: record.title.slice(AGENDA_PREFIX.length), date, time, location: String(data['location'] ?? ''), notes: String(data['notes'] ?? '') };
   } catch { return null; }
 }
-function dates(event: CoupleEvent) {
-  const start = new Date(`${event.date}T${event.time}:00`);
-  return { start, end: new Date(start.getTime() + 60 * 60_000) };
+export function brazilianToday(now = new Date()): string {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone: 'America/Sao_Paulo', year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(now);
+  const get = (type: string) => parts.find(p => p.type === type)?.value ?? '';
+  return `${get('year')}-${get('month')}-${get('day')}`;
+}
+/** Build wall-clock stamps independent from device timezone (important on iPhone).
+ * Consumers use TZID=America/Sao_Paulo instead of local browser UTC offsets. */
+function dates(event: CoupleEvent): { start: string; end: string } {
+  const start = new Date(`${event.date}T${event.time}:00Z`);
+  if (Number.isNaN(start.getTime())) throw new Error('Data do compromisso inválida.');
+  const end = new Date(start.getTime() + 60 * 60_000);
+  const stamp = (date: Date) => date.toISOString().slice(0, 19).replace(/[-:]/g, '');
+  return { start: stamp(start), end: stamp(end) };
 }
 const escapeIcs = (v: string) => v.replace(/\\/g, '\\\\').replace(/\n/g, '\\n').replace(/;/g, '\\;').replace(/,/g, '\\,');
 const utcIcs = (date: Date) => date.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '');
@@ -28,7 +40,7 @@ export function calendarIcs(event: CoupleEvent, id: string) {
   return [
     'BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Duet//Agenda do Casal//PT-BR', 'CALSCALE:GREGORIAN',
     'BEGIN:VEVENT', `UID:${id}@duet`, `DTSTAMP:${utcIcs(new Date())}`,
-    `DTSTART:${utcIcs(start)}`, `DTEND:${utcIcs(end)}`,
+    `DTSTART;TZID=America/Sao_Paulo:${start}`, `DTEND;TZID=America/Sao_Paulo:${end}`,
     `SUMMARY:${escapeIcs(event.title)}`, `LOCATION:${escapeIcs(event.location)}`,
     `DESCRIPTION:${escapeIcs(event.notes)}`, 'BEGIN:VALARM', 'ACTION:DISPLAY',
     'DESCRIPTION:Lembrete de compromisso do casal', 'TRIGGER:-PT15M', 'END:VALARM',
@@ -39,7 +51,7 @@ export function googleCalendarLink(event: CoupleEvent) {
   const { start, end } = dates(event);
   const params = new URLSearchParams({
     action: 'TEMPLATE', text: event.title, details: event.notes, location: event.location,
-    dates: `${utcIcs(start)}/${utcIcs(end)}`, ctz: 'America/Sao_Paulo',
+    dates: `${start}/${end}`, ctz: 'America/Sao_Paulo',
   });
   return `https://calendar.google.com/calendar/render?${params.toString()}`;
 }
