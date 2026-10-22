@@ -22,7 +22,8 @@ export async function sendDueInspirations(now = new Date()) {
     .select('user_id').eq('enabled', false);
   if (preferenceError) throw preferenceError;
   const optedOut = new Set((disabled ?? []).map(row => row.user_id));
-  const prompt = slot.id === 'cafe' ? dueQuestion(now) : null;
+  const sundayEvening = new Date(slot.date + 'T12:00:00Z').getUTCDay() === 0 && slot.id === 'noite';
+  const prompt = sundayEvening ? { id: 'remember' as const, date: slot.date } : slot.id === 'cafe' ? dueQuestion(now) : null;
   const selected = prompt ? questions.find(q => q.id === prompt.id) : null;
   const body = selected ? selected.title
     : slot.id === 'almoco' ? 'Já bebeu água hoje? Responde pra gente! 💧'
