@@ -49,6 +49,6 @@ export function dueQuestion(now: Date): { id: QuestionId; date: string } | null 
   const weekday = new Date(brazilianToday(now) + 'T12:00:00Z').getUTCDay();
   const id: QuestionId | null = weekday === 5 && hour >= 9 && hour < 12 ? 'friday' :
     weekday === 6 && hour >= 9 && hour < 12 ? 'saturday' :
-    weekday === 0 && hour >= 9 && hour < 12 ? 'remember' : null;
+    weekday === 0 && hour >= 9 && hour < 12 ? 'sunday' : null;
   return id ? { id, date: nextQuestionDate(id, now) } : null;
 }
