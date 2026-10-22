@@ -64,3 +64,17 @@ O Render Web Free hiberna quando inativo e pode demorar para acordar; isso atrap
 Após cada merge, confirme GitHub CI (testes, lint, TypeScript, build), Render deploy `live`, GET do endereço público, autenticação com conta de teste, inserção/edição/remoção de dados de teste, presença/chat e push com duas inscrições reais. Proteger dados pessoais. Em falha, não afirmar conclusão de um teste não realizado.
 
 **Segurança**: `.env` do repositório contém configurações públicas (URLs e chaves publicáveis) e não deve receber nenhuma chave privada. Adicionar `.env.local` ao `.gitignore`; os segredos ficam no Render/GitHub Secrets.
+
+## Dream Match — busca de locais e custos (22/10/2026)
+
+- A busca automática passa pelo servidor do **Render**, chama diretamente a API Firecrawl v2 e exige `FIRECRAWL_API_KEY` **no Render**; nenhuma chave fica no navegador, GitHub ou Supabase.
+- O Firecrawl tem plano gratuito de **1.000 créditos/mês** (sem cartão, conforme tabela pública consultada em 22/10/2026). Uma pesquisa com até dez resultados custa **2 créditos**; em tese até 500 pesquisas no mês se os créditos forem usados exclusivamente para esse tipo de busca. Scrapes de fotos/metadados e outras chamadas também consomem créditos. Cotas e preços podem mudar.
+- Pesquisas públicas idênticas são armazenadas em cache no servidor por 15 minutos (até 100 entradas), economizando créditos. A busca não invoca LLM.
+- A ordenação das descobertas consulta **curtidas do próprio casal** já disponíveis no Duet e prioriza características dos locais previamente aprovados, sem exigir um provedor externo de IA ou gravar dados novos.
+- Em Tiradentes, se o Firecrawl não estiver configurado ou falhar, há três referências públicas identificadas (Alma Serra Vila, Espaço Raízes e Pousada Brisa da Serra) para consulta e inclusão manual. **Não são resultados novos, ranking de popularidade, confirmação de disponibilidade nem promessa de que aceitam eventos.**
+- Fora de Tiradentes, enquanto faltar uma chave, a busca automática continuará indisponível; cadastrar referências por link/perfil permanece possível.
+- Conectar o Firecrawl **ao ChatGPT** não fornece automaticamente a chave ao **Render**. A integração do plugin consegue fazer buscas nesta conversa, mas não pode transferir sua credencial privada para outro serviço.
+- Para ativar a busca no aplicativo: autenticar uma conta administradora em https://www.firecrawl.dev/app/api-keys, criar/obter a chave privada e adicioná-la exclusivamente como `FIRECRAWL_API_KEY` em Render → serviço `danlet` → Environment. Manter o plano gratuito e não habilitar cobranças automáticas sem decisão expressa dos responsáveis.
+- Após registrar a chave, publicar/reiniciar o serviço e validar com o usuário autenticado pesquisando `Tiradentes, MG`; validar também uma cidade que não possua sugestões previamente cadastradas para comprovar que a busca ao vivo realmente funciona.
+
+A fonte confiável para planos, cotas e limites é a página https://www.firecrawl.dev/pricing. A documentação oficial do fallback sem chave informa limitações de rate limit e bloqueios de chamadas que parecem vir de VPN ou proxy; **não confiar no modo sem chave para produção**.
