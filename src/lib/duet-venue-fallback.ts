@@ -12,12 +12,12 @@ const TIRADENTES_VENUES: readonly VenueSource[] = [
   {
     title: 'Espaço Raízes — Tiradentes',
     url: 'https://www.instagram.com/espacoraizesmg/',
-    description: 'Espaço divulgado para casamentos e eventos em Tiradentes. Confirme serviços e disponibilidade com o estabelecimento.',
+    description: 'Espaço citado em relatos de casamentos realizados em Tiradentes. Confirme a operação atual, a estrutura e as datas disponíveis.',
   },
   {
-    title: 'Pousada Brisa da Serra — guia de fornecedores',
-    url: 'https://www.constancezahn.com/fornecedores/pousada-brisa-da-serra/',
-    description: 'Referência pública de pousada para celebrações em Tiradentes. Verifique diretamente se recebe o evento desejado.',
+    title: 'Pousada Brisa da Serra — casamentos',
+    url: 'https://www.brisadaserra.com.br/casamentos',
+    description: 'Pousada em Tiradentes com página oficial de casamentos boutique; consulte propostas, visitas e datas diretamente.',
   },
 ];
 
