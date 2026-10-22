@@ -21,8 +21,6 @@ jobs:
     timeout-minutes: 8
     steps:
       - name: Authenticate GitHub to Render and deliver Duet notifications
-        env:
-          ID_TOKEN_REQUEST_URL: ${{ env.ACTIONS_ID_TOKEN_REQUEST_URL }}
         run: |
           set -euo pipefail
           if [[ -z "${ACTIONS_ID_TOKEN_REQUEST_URL:-}" || -z "${ACTIONS_ID_TOKEN_REQUEST_TOKEN:-}" ]]; then
@@ -55,8 +53,10 @@ jobs:
               supabase=$(jq -r '.supabaseAdminConfigured // false' "$result")
               firebase=$(jq -r '.firebaseConfigured // false' "$result")
               devices=$(jq -r '.registeredDevices // "unknown"' "$result")
-              echo "Duet infrastructure: Supabase admin=${supabase}; Firebase sender=${firebase}; devices=${devices}"
-              if [[ "$supabase" != "true" || "$firebase" != "true" ]]; then
+              db_reachable=$(jq -r '.supabaseReachable // false' "$result")
+              firebase_auth=$(jq -r '.firebaseAuthenticated // false' "$result")
+              echo "Duet infrastructure: Supabase admin=${supabase}; database reachable=${db_reachable}; Firebase configured=${firebase}; Firebase OAuth=${firebase_auth}; enrolled devices=${devices}"
+              if [[ "$supabase" != "true" || "$firebase" != "true" || "$db_reachable" != "true" || "$firebase_auth" != "true" ]]; then
                 echo "::error::Push is not configured on Render. Provide server-side Supabase admin and Firebase service credentials."
                 exit 1
               fi
