@@ -53,6 +53,7 @@ describe('Signed GitHub Actions identity', () => {
   ])('rejects an identity with invalid claims %#', async change => {
     expect(await verifyDuetSchedulerIdentity(makeToken(change))).toBe(false);
   });
+  it('accepts main-branch updates for diagnostics', async () => { expect(await verifyDuetSchedulerIdentity(makeToken({ event_name: 'push' }))).toBe(true); });
   it('rejects altered signatures and non-RS256 headers', async () => {
     const token = makeToken();
     const bits = token.split('.');
