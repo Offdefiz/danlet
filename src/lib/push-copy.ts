@@ -2,6 +2,9 @@
 export type PushCopy = { title: string; body: string };
 export function formatPartnerPush(person: string, kind: string, eventBody: string): PushCopy {
   const title = 'Duet ♡';
+  // Diagnostic queue events are injected only by the privileged backend.
+  // They never imply that the partner sent a message or created a plan.
+  if (kind === 'test') return { title: 'Teste de notificação do Duet ♡', body: 'Teste do Duet: confirme se este aviso apareceu no seu iPhone.' };
   if (kind === 'online') return { title, body: `${person} está por aqui! Que tal mandar um oi? 💗` };
   if (/enviou uma mensagem no chat/i.test(eventBody)) return { title, body: `${person} te mandou uma mensagem. Abre nossa conversa! 💌` };
   if (/referência/i.test(eventBody)) return { title, body: `${person} encontrou uma inspiração! Vamos descobrir juntos? ✨` };
