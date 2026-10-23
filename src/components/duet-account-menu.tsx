@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Bell, HelpCircle, LogOut, Mail, Palette, Settings, Shield, UserRound } from 'lucide-react';
+import { Bell, HelpCircle, LogOut, Mail, Palette, Settings, Shield, UserRound, ScrollText } from 'lucide-react';
 import { toast } from 'sonner';
 import { Avatar } from '@/components/duet-extras';
+import { openDuetUpdates } from '@/components/duet-updates';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -63,7 +64,7 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button type="button" variant="ghost" className="h-12 gap-2 rounded-full border border-border px-2" aria-label="Abrir configurações">
-          <Avatar profile={profile} name={name} size={34}/>
+          <Avatar profile={profile} name={name} size={42}/>
           <span className="max-w-20 truncate text-xs font-medium">{name}</span>
           <Settings size={17} className="text-muted-foreground"/>
         </Button>
@@ -73,6 +74,7 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
         <DropdownMenuSeparator/>
         <DropdownMenuItem onSelect={onProfile}><UserRound/>Meu perfil</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('duet:open-theme'))}><Palette/>Alterar tema</DropdownMenuItem>
+        <DropdownMenuItem onSelect={openDuetUpdates}><ScrollText/>Novidades do Duet</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => window.dispatchEvent(new Event('duet:open-notifications'))}><Bell/>Notificações</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setAccountOpen(true)}><Mail/>E-mail e senha</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => setPrivacyOpen(true)}><Shield/>Privacidade</DropdownMenuItem>
@@ -93,7 +95,7 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
     </Dialog>
     <Dialog open={privacyOpen} onOpenChange={setPrivacyOpen}>
       <DialogContent><DialogHeader><DialogTitle>Privacidade</DialogTitle></DialogHeader>
-        <p className="text-sm leading-relaxed text-muted-foreground">Suas cores são guardadas apenas neste navegador, separadas por conta. Mensagens, metas e escolhas são compartilhadas com o outro integrante do casal por meio do Supabase. Evite acessar a conta em aparelhos públicos.</p>
+        <p className="text-sm leading-relaxed text-muted-foreground">Suas cores são guardadas apenas neste navegador, separadas por conta. Mensagens, metas e escolhas são compartilhadas com o outro integrante do casal por meio do Supabase. As notificações de mensagens podem exibir uma prévia na tela bloqueada, conforme as configurações do iPhone. Evite acessar a conta em aparelhos públicos.</p>
         <Button onClick={() => setPrivacyOpen(false)}>Entendi</Button>
       </DialogContent>
     </Dialog>
