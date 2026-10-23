@@ -264,7 +264,18 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         </div>
       </div>
     </section>}
-    {tab === 'plans' && <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Um passo de cada vez</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Nossos planos <span className="text-primary">♡</span></h1><Button size="icon" title="Adicionar meta" aria-label="Adicionar meta" onClick={() => newRecord('goal')}><Plus/></Button></div><div className="my-6 flex flex-wrap gap-2">{periods.map(p => <Button key={p} variant={p === period ? 'default' : 'outline'} className="text-xs" onClick={() => setPeriod(p)}>{p}</Button>)}</div><div className="grid gap-4 sm:grid-cols-2">{goals.filter(g => g.period === period).map(g => {
+    {tab === 'plans' && <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Um passo de cada vez</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Nossos planos <span className="text-primary">♡</span></h1><Button size="icon" title="Adicionar meta" aria-label="Adicionar meta" onClick={() => newRecord('goal')}><Plus/></Button></div>{data.proposals.some(proposal => proposal.status === 'agreed') && <section className="mt-5 rounded-2xl border border-border bg-card p-4">
+      <h2 className="flex items-center gap-2 font-semibold"><CheckCheck className="text-success" size={18}/>Combinados no Juntos</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Somente propostas aceitas por Daniel e Letícia.</p>
+      <div className="mt-3 grid gap-2 sm:grid-cols-2">
+        {data.proposals.filter(proposal => proposal.status === 'agreed').slice(0, 10).map(proposal =>
+          <div key={proposal.id} className="rounded-xl border border-border bg-secondary/40 p-3">
+            <p className="font-medium">{proposal.title}</p>
+            <p className="mt-1 text-xs text-muted-foreground">{new Date(proposal.date + 'T12:00:00').toLocaleDateString('pt-BR')} às {proposal.time} · Confirmado pelos dois</p>
+          </div>)}
+      </div>
+    </section>}
+    <div className="my-6 flex flex-wrap gap-2">{periods.map(p => <Button key={p} variant={p === period ? 'default' : 'outline'} className="text-xs" onClick={() => setPeriod(p)}>{p}</Button>)}</div><div className="grid gap-4 sm:grid-cols-2">{goals.filter(g => g.period === period).map(g => {
       const signatures = data.signatures.filter(s => s.record_id === g.id); const signed = signatures.some(s => s.user_id === userId);
       return <article key={g.id} className="rounded-lg border border-border bg-card p-5"><div className="flex justify-between"><span className="text-xs text-success">{signatures.length === 2 ? 'Concluída pelos dois' : g.period}</span><div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${g.title}`} onClick={() => edit(g)}><Pencil/></Button><Button variant="ghost" size="icon" aria-label={`Excluir ${g.title}`} onClick={() => remove(g)}><Trash2/></Button></div></div><h2 className="mt-3 text-lg font-semibold">{g.title}</h2><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{g.body}</p><div className="mt-5 flex flex-wrap gap-2 text-xs">{data.members.map(m => <span key={m.user_id} className="flex items-center gap-1 text-muted-foreground">{signatures.some(s => s.user_id === m.user_id) ? <CheckCheck size={13} className="text-success"/> : <Clock size={13}/>} {m.person}</span>)}</div><Button disabled={busy || signed || signatures.length === 2} variant={signatures.length === 2 ? 'success' : 'outline'} className="mt-4 w-full" onClick={() => sign(g)}>{signatures.length === 2 ? 'Meta concluída! ♡' : signed ? `Aguardando ${partnerName}` : 'Assinar conclusão'}</Button></article>;
     })}</div>{!goals.some(g => g.period === period) && <Empty text="Nossos planos começam com uma decisão real." action="Criar uma meta" onClick={() => newRecord('goal')}/>}</div>}
