@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { resendJuntosProposal } from '@/lib/juntos-reminders.functions';
 import { playDuetSound } from '@/lib/duet-sounds';
-import { juntosIdeas, newSuggestionDate, parseProposalLink, proposalSection } from '@/lib/juntos-suggestions';
+import { juntosIdeas, newSuggestionDate, parseProposalLink, proposalSection, canRemindPartner } from '@/lib/juntos-suggestions';
 import { parseQuestionLink } from '@/lib/weekend-prompts';
 import type { Row } from '@/lib/duet.types';
 
@@ -244,7 +244,7 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
             <Button type="button" size="sm" variant="outline" disabled={busy || mine?.accepted === false}
               onClick={() => void respond(proposal.id, false)} className="flex-1"><ThumbsDown size={14}/>Agora não</Button>
           </div>}
-          {!agreed && !theirs && partner && <Button type="button" size="sm" variant="ghost"
+          {partner && canRemindPartner(proposal, Boolean(theirs), today) && <Button type="button" size="sm" variant="ghost"
             className="mt-2 w-full gap-2 border border-dashed border-border"
             disabled={busy || resendingId !== null}
             aria-label={`Reenviar notificação para ${partnerName}: ${proposal.title}`}
