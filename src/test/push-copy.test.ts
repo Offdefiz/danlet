@@ -8,6 +8,12 @@ describe('Duet notification presentation', () => {
       body: 'Letícia está por aqui! Que tal mandar um oi? 💗',
     });
   });
+  it('marks deliberate admin diagnostics as tests without inventing partner activity', () => {
+    const notification = formatPartnerPush('Letícia', 'test', 'qa_push_delivery_20261023');
+    expect(notification.title).toContain('Teste');
+    expect(notification.body).toMatch(/confirme.*iPhone/);
+    expect(notification.body).not.toMatch(/Letícia.*enviou/);
+  });
   it('keeps message content private on the lock screen', () => {
     const result = formatPartnerPush('Daniel', 'addition', 'enviou uma mensagem no chat');
     expect(result.title).toBe('Duet ♡');
