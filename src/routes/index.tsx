@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { DuetLogin } from "@/components/duet-login";
 import { DuetOrganizer } from "@/components/duet-organizer";
+import { rememberActiveSoundUser } from "@/lib/duet-sounds";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -36,6 +37,7 @@ function DuetApp() {
     const { data } = supabase.auth.onAuthStateChange((_e, session) => setUserId(session?.user.id ?? null));
     return () => data.subscription.unsubscribe();
   }, []);
+  useEffect(() => { if (userId !== undefined) rememberActiveSoundUser(userId); }, [userId]);
   if (userId === undefined) return <div className="min-h-screen bg-background" />;
   return userId ? <DuetOrganizer userId={userId} /> : <DuetLogin />;
 }
