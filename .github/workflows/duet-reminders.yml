@@ -73,6 +73,15 @@ jobs:
               if [[ "$devices" == "0" ]]; then
                 echo "::warning::No enrolled PWA devices. Install Duet and allow push on each iPhone."
               fi
+            elif [[ "$route" == "partner-notifications" ]]; then
+              accepted=$(jq -r '.sent // 0' "$result")
+              echo "FCM accepted partner notifications: ${accepted}"
+              echo "Partner push accepted by FCM: ${accepted}" >> "$GITHUB_STEP_SUMMARY"
+            elif [[ "$route" == "inspire" ]]; then
+              accepted=$(jq -r '.sent // 0' "$result")
+              slot=$(jq -r '.slot // .reason // "unknown"' "$result")
+              echo "FCM accepted Duet reminders: ${accepted}; slot or reason: ${slot}"
+              echo "Reminder push accepted by FCM: ${accepted}; slot/reason: ${slot}" >> "$GITHUB_STEP_SUMMARY"
             fi
           done
           echo "Duet notification jobs completed with authenticated requests." >> "$GITHUB_STEP_SUMMARY"
