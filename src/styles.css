@@ -318,3 +318,28 @@
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after { scroll-behavior: auto !important; animation-duration: 0.01ms !important; transition-duration: 0.01ms !important; }
 }
+
+
+/* Selective liquid-glass treatment: navigation and existing glass panels only. */
+@supports (backdrop-filter: blur(12px)) {
+  .glass-panel {
+    position: relative;
+    background: color-mix(in srgb, var(--card) 80%, transparent);
+    border: 1px solid color-mix(in srgb, white 36%, var(--border));
+    backdrop-filter: blur(24px) saturate(155%);
+    -webkit-backdrop-filter: blur(24px) saturate(155%);
+    box-shadow: inset 0 1px 0 #ffffff55, 0 10px 32px #20162213;
+  }
+  .glass-panel::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(145deg, #ffffff38, transparent 42%, #ffffff12 100%);
+    pointer-events: none;
+  }
+  .glass-panel > * { position: relative; }
+}
+@media (prefers-contrast: more) {
+  .glass-panel { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; }
+}
