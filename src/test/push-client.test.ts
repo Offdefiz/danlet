@@ -5,7 +5,7 @@ const fcm = vi.hoisted(() => ({
   getApps: vi.fn(() => []),
   getMessaging: vi.fn(() => ({})),
   getToken: vi.fn(async () => 'test-device-token'),
-  onMessage: vi.fn(() => vi.fn()),
+  onMessage: vi.fn((_messaging: unknown, _handler: (payload: unknown) => void) => vi.fn()),
   isSupported: vi.fn(async () => true),
   upsert: vi.fn(async () => ({ error: null })),
 }));
