@@ -25,6 +25,26 @@ describe('Duet notification presentation', () => {
     expect(formatQuickReplyPush('Letícia', 'Que passeio? — Ainda não sei')?.body).toMatch(/escolherem juntos/);
     expect(formatQuickReplyPush('Letícia', 'Mensagem secreta')).toBeNull();
   });
+  it('maintains exact 20-minute boundaries across midnight in São Paulo', () => {
+    const samples = [
+      ['2026-10-23T02:59:00Z', 't23-40', '2026-10-22'],
+      ['2026-10-23T03:00:00Z', 't00-00', '2026-10-23'],
+      ['2026-10-23T03:19:59Z', 't00-00', '2026-10-23'],
+      ['2026-10-23T03:20:00Z', 't00-20', '2026-10-23'],
+      ['2026-10-23T03:40:00Z', 't00-40', '2026-10-23'],
+      ['2026-10-23T04:00:00Z', 't01-00', '2026-10-23'],
+    ] as const;
+    for (const [iso, id, date] of samples)
+      expect(currentReminderSlot(new Date(iso))).toEqual({ id, date });
+    expect(new Set(reminderSlots.map(slot => slot.id)).size).toBe(72);
+  });
+  it('has a varied message for every scheduled slot in one calendar day', () => {
+    expect(reminderSlots).toHaveLength(72);
+    const messages = reminderSlots.map(slot => reminderMessage('2026-10-23', slot.id, 'daniel'));
+    expect(new Set(messages).size).toBe(72);
+    expect(reminderMessage('2026-10-23', reminderSlots[0]!.id, 'daniel'))
+      .not.toBe(reminderMessage('2026-10-24', reminderSlots[0]!.id, 'daniel'));
+  });
   it('provides 72 twenty-minute slots over the full day without a daily ceiling', () => {
     expect(reminderSlots).toHaveLength(72);
     expect(currentReminderSlot(new Date('2026-10-20T06:00:00Z'))).toEqual({ id: 't03-00', date: '2026-10-20' }); // 03h Brazil
