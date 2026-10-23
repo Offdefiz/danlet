@@ -3,6 +3,9 @@ import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { supabase } from '@/integrations/supabase/client';
 import { syncPartnerNotifications } from '@/lib/notifications.functions';
+import { subscribeForegroundPush } from '@/lib/push-client';
+import { playDuetSound } from '@/lib/duet-sounds';
+import { toast } from 'sonner';
 
 export function useDuet(userId: string) {
   const cache = useQueryClient();
@@ -44,5 +47,32 @@ export function useDuet(userId: string) {
     document.addEventListener('visibilitychange', heartbeat);
     return () => { window.clearInterval(interval); window.removeEventListener('online', heartbeat); document.removeEventListener('visibilitychange', heartbeat); };
   }, [syncNotifications, userId]);
+  useEffect(() => {
+    let cancelled = false;
+    let unsubscribe: (() => void) | null = null;
+    void subscribeForegroundPush(notice => {
+      // Foreground Firebase messages do not automatically create a visible
+      // notification. Keep it visible in the app even when iOS hides the banner.
+      toast(notice.title, {
+        description: notice.body,
+        duration: 7000,
+        action: { label: 'Abrir', onClick: () => { window.location.href = notice.url; } },
+      });
+      playDuetSound('notification', userId);
+      if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
+        void navigator.serviceWorker.ready.then(reg =>
+          reg.showNotification(notice.title, {
+            body: notice.body,
+            tag: 'duet-foreground-' + Date.now(),
+            icon: '/icons/duet-192.png',
+            data: { duetForeground: true, url: notice.url },
+          })
+        ).catch(() => { /* In-app alert is the reliable foreground fallback. */ });
+      }
+    }).then(unsub => {
+      if (cancelled) unsub?.(); else unsubscribe = unsub;
+    }).catch(() => { /* Realtime + next Firebase registration remain available. */ });
+    return () => { cancelled = true; unsubscribe?.(); };
+  }, [userId]);
   return query;
 }
