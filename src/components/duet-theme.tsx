@@ -15,6 +15,7 @@ export const themes = [
   { id: 'rose', label: 'Rosa original', description: 'Rosa intenso', colors: ['#FAF8F8', '#B85B85', '#F0D5E1'] },
   { id: 'ocean', label: 'Oceano original', description: 'Azul relaxante', colors: ['#FAF8F8', '#427A99', '#D3E5EF'] },
   { id: 'pink-glitter', label: 'Barbie Glitter ✨', description: 'Rosa cintilante com brilho animado', colors: ['#FFF6FB', '#BB4D86', '#F6BBD9'] },
+  { id: 'metallic-purple', label: 'Metallic Purple', description: 'Roxo cromado e metal líquido em movimento', colors: ['#100A23', '#B9A0FA', '#6D3EBF'] },
 ] as const;
 
 type ThemeId = (typeof themes)[number]['id'];
@@ -87,8 +88,10 @@ export function ThemePicker({ userId, hideTrigger = false }: { userId: string; h
           className="flex min-h-20 items-center gap-3 rounded-xl border border-border bg-card p-3 text-left text-foreground transition-colors hover:bg-muted disabled:opacity-60">
           {item.id === 'pink-glitter'
             ? <span className="duet-glitter-preview flex h-11 w-[76px] shrink-0 items-center justify-center rounded-xl border border-[#E5A4BF] shadow-sm" aria-hidden="true"><span className="relative z-[1] text-xl text-white drop-shadow-sm">♡</span></span>
-            : <span className="flex shrink-0 -space-x-2" aria-hidden="true">{item.colors.map((color, i) =>
-              <span key={i} className="h-8 w-8 rounded-full border border-black/10" style={{ backgroundColor: color }}/>)}</span>}
+            : item.id === 'metallic-purple'
+              ? <span className="duet-liquid-purple-preview flex h-11 w-[76px] shrink-0 items-center justify-center rounded-xl" aria-hidden="true"><span className="relative z-[1] text-xl text-white/90 drop-shadow-md">♡</span></span>
+              : <span className="flex shrink-0 -space-x-2" aria-hidden="true">{item.colors.map((color, i) =>
+                <span key={i} className="h-8 w-8 rounded-full border border-black/10" style={{ backgroundColor: color }}/>)}</span>}
           <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.label}</span><span className="block text-xs text-muted-foreground">{item.description}</span></span>
           {selected === item.id && <Check size={17} className="shrink-0 text-primary"/>}
         </button>)}</div><div className="mt-4 flex justify-end gap-2"><Button variant="outline" onClick={() => setOpen(false)}>Cancelar</Button><Button onClick={applyTheme} disabled={selected === theme}>Aplicar tema</Button></div></DialogContent></Dialog></>;
