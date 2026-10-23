@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { syncPartnerNotifications } from '@/lib/notifications.functions';
 import { subscribeForegroundPush } from '@/lib/push-client';
 import { playDuetSound } from '@/lib/duet-sounds';
-import { toast } from 'sonner';
+import { showDuetTopNotice, showPartnerChatBanner } from '@/lib/chat-banners';
 
 export function useDuet(userId: string) {
   const cache = useQueryClient();
@@ -29,6 +29,13 @@ export function useDuet(userId: string) {
   useEffect(() => {
     const channel = supabase.channel(`duet-${userId}`);
     for (const table of ['records', 'references_catalog', 'votes', 'signatures', 'activity', 'messages', 'profiles', 'couple_proposals', 'couple_proposal_votes']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void cache.invalidateQueries({ queryKey: ['duet', userId] }));
+    channel.on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'messages' }, payload => {
+      const incoming = payload.new as { id?: string; user_id?: string; body?: string };
+      if (!incoming.user_id || incoming.user_id === userId || typeof incoming.body !== 'string') return;
+      const state = cache.getQueryData<{ members: { user_id: string; person: string }[] }>(['duet', userId]);
+      const sender = state?.members.find(member => member.user_id === incoming.user_id)?.person ?? 'Seu par';
+      if (showPartnerChatBanner(sender, incoming.body)) playDuetSound('notification', userId);
+    });
     const drain = () => { void syncNotifications({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error)); };
     for (const table of ['records', 'references_catalog', 'messages', 'activity', 'profiles', 'couple_proposals', 'couple_proposal_votes']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, drain);
     channel.subscribe(status => { if (status === 'SUBSCRIBED') void cache.invalidateQueries({ queryKey: ['duet', userId] }); });
@@ -53,12 +60,10 @@ export function useDuet(userId: string) {
     void subscribeForegroundPush(notice => {
       // Foreground Firebase messages do not automatically create a visible
       // notification. Keep it visible in the app even when iOS hides the banner.
-      toast(notice.title, {
-        description: notice.body,
-        duration: 7000,
-        action: { label: 'Abrir', onClick: () => { window.location.href = notice.url; } },
-      });
-      playDuetSound('notification', userId);
+      // All foreground notices appear in the top banner. Realtime message
+      // inserts use the same deduplication to avoid duplicate alerts.
+      const first = showDuetTopNotice(notice.title, notice.body, notice.url);
+      if (first) playDuetSound('notification', userId);
       if ('serviceWorker' in navigator && 'Notification' in window && Notification.permission === 'granted') {
         void navigator.serviceWorker.ready.then(reg =>
           reg.showNotification(notice.title, {
