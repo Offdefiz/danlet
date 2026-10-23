@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
+import { ThemePicker, readPersonalTheme, themes, themeGroups } from '@/components/duet-theme';
 
 const { successToast, errorToast } = vi.hoisted(() => ({
   successToast: vi.fn(),
@@ -27,9 +27,23 @@ afterEach(() => {
 
 describe('Personal themes stored on each device', () => {
   it('preserves the original palettes and adds glitter and purple chrome', () => {
-    expect(themes).toHaveLength(11);
+    expect(themes).toHaveLength(13);
     expect(themes.find(t => t.id === 'pink-glitter')?.label).toMatch(/Glitter/);
     expect(themes.find(t => t.id === 'metallic-purple')?.label).toBe('Metallic Purple');
+  });
+
+  it('shows Premium first, including two new freely available luxury themes', () => {
+    expect(themeGroups.map(g => g.label)).toEqual(['Premium', 'Elegantes', 'Simples']);
+    expect(themeGroups[0]?.themeIds).toEqual([
+      'pink-glitter', 'metallic-purple', 'black-diamond', 'champagne-gold',
+    ]);
+    const allIds = themeGroups.flatMap(group => group.themeIds);
+    expect(new Set(allIds).size).toBe(13);
+    expect(themes.map(theme => theme.id).sort()).toEqual([...allIds].sort());
+    render(<ThemePicker userId={daniel}/>);
+    fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
+    expect(screen.getByRole('button', { name: /Black Diamond/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /Champagne Gold/i })).toBeTruthy();
   });
 
   it('saves a palette in localStorage and restores it when reopened', async () => {
