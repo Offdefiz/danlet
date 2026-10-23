@@ -1,142 +1,228 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, Heart, Sparkles, Clock, CheckCircle2 } from 'lucide-react';
+import { CalendarDays, CheckCheck, Heart, Clock, Sparkles, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { playDuetSound } from '@/lib/duet-sounds';
-import { questions, nextQuestionDate, parseQuestionLink, readQuestionAnswer, makeAnswerRecord, type QuestionId } from '@/lib/weekend-prompts';
+import { juntosIdeas, newSuggestionDate, parseProposalLink } from '@/lib/juntos-suggestions';
+import { parseQuestionLink } from '@/lib/weekend-prompts';
 import type { Row } from '@/lib/duet.types';
 
-type Props = { records: Row<'records'>[]; members: Row<'couple_members'>[]; userId: string; onSaved: () => Promise<unknown> };
-export function DuetQuestions({ records, members, userId, onSaved }: Props) {
-  const [selected, setSelected] = useState<QuestionId | null>(null);
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('19:30');
-  const [answer, setAnswer] = useState('');
-  const [busy, setBusy] = useState(false);
-  const saved = records.map(row => ({ row, answer: readQuestionAnswer(row) }))
-    .filter((item): item is { row: Row<'records'>; answer: NonNullable<typeof item.answer> } => Boolean(item.answer));
+type Props = {
+  proposals: Row<'couple_proposals'>[];
+  proposalVotes: Row<'couple_proposal_votes'>[];
+  members: Row<'couple_members'>[];
+  userId: string;
+  onSaved: () => Promise<unknown>;
+};
+const categories = [...new Set(juntosIdeas.map(idea => idea.category))];
 
-  function choose(id: QuestionId, overrideDate?: string) {
-    const q = questions.find(p => p.id === id)!;
-    const targetDate = overrideDate || nextQuestionDate(id);
-    const existing = saved.find(x => x.answer.questionId === id && x.answer.date === targetDate && x.answer.by === userId);
-    setSelected(id); setDate(targetDate); setTime(existing?.answer.time || q.time);
-    setAnswer(existing?.answer.answer || '');
-  }
+export function DuetQuestions({ proposals, proposalVotes, members, userId, onSaved }: Props) {
+  const [category, setCategory] = useState('Todos');
+  const [title, setTitle] = useState('');
+  const [date, setDate] = useState(() => newSuggestionDate());
+  const [time, setTime] = useState('19:30');
+  const [busy, setBusy] = useState(false);
+  const [focusedProposal, setFocusedProposal] = useState<string | null>(null);
+  const [showAll, setShowAll] = useState(false);
+  const partner = members.find(member => member.user_id !== userId);
+  const meName = members.find(member => member.user_id === userId)?.person || 'Você';
+  const partnerName = partner?.person || 'Seu par';
+  const topIdeas = category === 'Todos' ? juntosIdeas : juntosIdeas.filter(idea => idea.category === category);
+
+  const chooseIdea = (idea: typeof juntosIdeas[number]) => {
+    setTitle(idea.title);
+    setTime(idea.time);
+    setDate(newSuggestionDate());
+    playDuetSound('question', userId);
+  };
 
   useEffect(() => {
-    const checkLink = () => {
-      const link = parseQuestionLink(window.location.search);
-      if (link) choose(link.id, link.date);
+    const openDeepLink = () => {
+      const proposalId = parseProposalLink(window.location.search);
+      if (proposalId) {
+        setFocusedProposal(proposalId);
+        setShowAll(true);
+      } else {
+        const legacy = parseQuestionLink(window.location.search);
+        if (legacy) {
+          const ideaId = legacy.id === 'friday' ? 'jantar' : legacy.id === 'saturday' ? 'passeio'
+            : legacy.id === 'sunday' ? 'descanso' : 'agenda';
+          const idea = juntosIdeas.find(item => item.id === ideaId);
+          if (idea) { setTitle(idea.title); setDate(legacy.date); setTime(idea.time); }
+        }
+      }
     };
-    checkLink();
-    window.addEventListener('focus', checkLink);
-    window.addEventListener('popstate', checkLink);
-    const onOpen = (event: Event) => {
-      const detail = (event as CustomEvent<{ id: QuestionId; date?: string }>).detail;
-      if (detail?.id) choose(detail.id, detail.date);
-    };
-    window.addEventListener('duet:open-question', onOpen);
+    openDeepLink();
+    window.addEventListener('focus', openDeepLink);
+    window.addEventListener('popstate', openDeepLink);
     return () => {
-      window.removeEventListener('duet:open-question', onOpen);
-      window.removeEventListener('focus', checkLink);
-      window.removeEventListener('popstate', checkLink);
+      window.removeEventListener('focus', openDeepLink);
+      window.removeEventListener('popstate', openDeepLink);
     };
-    // Run once on mount; changes to answers are reflected when selecting a card.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  async function quickReply(label: string, question: string) {
+  async function propose(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy || !title.trim()) return;
+    if (!navigator.onLine) { toast.error('Sem internet para criar a proposta.'); return; }
+    const duplicate = proposals.find(item => item.title.toLowerCase() === title.trim().toLowerCase()
+      && item.date === date && item.status !== 'agreed');
+    if (duplicate) { setFocusedProposal(duplicate.id); toast('Esta ideia já está no Juntos. Responda à proposta existente.'); return; }
+    setBusy(true);
+    try {
+      const { data, error } = await supabase.from('couple_proposals')
+        .insert({ title: title.trim(), date, time, created_by: userId })
+        .select('id').single();
+      if (error) throw error;
+      // The creator accepts the plan, but no calendar record is inserted until
+      // the other registered partner independently accepts too.
+      const vote = await supabase.rpc('vote_duet_proposal', { p_proposal_id: data.id, p_accept: true });
+      if (vote.error) throw vote.error;
+      setFocusedProposal(data.id);
+      await onSaved();
+      playDuetSound('success', userId);
+      toast.success('Você topou! A proposta está esperando a resposta de ' + partnerName + '.');
+      setTitle('');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível criar a proposta.');
+    } finally { setBusy(false); }
+  }
+
+  async function respond(id: string, accept: boolean) {
+    if (busy) return;
+    if (!navigator.onLine) { toast.error('Sem conexão para responder.'); return; }
+    setBusy(true);
+    try {
+      const result = await supabase.rpc('vote_duet_proposal', { p_proposal_id: id, p_accept: accept });
+      if (result.error) throw result.error;
+      await onSaved();
+      playDuetSound(accept ? 'success' : 'question', userId);
+      toast.success(result.data === 'agreed'
+        ? 'Match dos dois! Agora sim, entrou na Agenda. ♡'
+        : accept ? 'Seu sim foi salvo. Falta o sim de ' + partnerName + '.'
+          : 'Tudo bem! A proposta não vai entrar na Agenda.');
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Falha ao responder à proposta.');
+    } finally { setBusy(false); }
+  }
+
+  async function quickReply(label: string) {
     if (!navigator.onLine) { toast.error('Sem internet para enviar sua resposta.'); return; }
     setBusy(true);
     try {
-      const { error } = await supabase.from('messages').insert({ user_id: userId, body: question + ' — ' + label });
+      const { error } = await supabase.from('messages')
+        .insert({ user_id: userId, body: 'Já bebeu água hoje? — ' + label });
       if (error) throw error;
       await onSaved();
       playDuetSound('success', userId);
-      toast.success('Resposta enviada para seu par ♡');
-      setSelected(null);
+      toast.success('Recadinho enviado ao seu par ♡');
     } catch { toast.error('Não foi possível enviar. Tente novamente.'); }
     finally { setBusy(false); }
   }
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    if (!selected || busy) return;
-    if (!navigator.onLine) { toast.error('Sem internet: sua resposta ainda não foi salva.'); return; }
-    setBusy(true);
-    try {
-      const payload = makeAnswerRecord({ questionId: selected, date, time, answer, by: userId });
-      const previous = saved.find(x => x.answer.questionId === selected && x.answer.date === date && x.answer.by === userId);
-      if (previous) {
-        const { data, error } = await supabase.from('records').update(payload)
-          .eq('id', previous.row.id).eq('version', previous.row.version).select('id');
-        if (error) throw error;
-        if (!data.length) throw new Error('Este plano foi alterado em outro aparelho. Atualize e tente novamente.');
-      } else {
-        const { error } = await supabase.from('records').insert({ ...payload, created_by: userId });
-        if (error) throw error;
-      }
-      await onSaved();
-      playDuetSound('success', userId);
-      toast.success('Sua ideia entrou no planejamento dos dois ♡');
-      setSelected(null);
-      if (window.location.search.includes('duet_question=')) window.history.replaceState(null, '', '/');
-    } catch (error) { toast.error(error instanceof Error ? error.message : 'Não foi possível salvar esta ideia.'); }
-    finally { setBusy(false); }
-  }
-  const chosen = questions.find(q => q.id === selected);
-  const name = (user: string) => members.find(m => m.user_id === user)?.person || 'Seu par';
-  return <section className="mx-auto max-w-2xl space-y-5" aria-label="Perguntas e planos do casal">
-    <header><p className="text-xs font-semibold uppercase tracking-[.18em] text-primary">Nosso fim de semana</p>
-      <h1 className="mt-2 text-3xl font-semibold">Vamos combinar? ♡</h1>
-      <p className="mt-2 text-sm text-muted-foreground">Uma pergunta, uma resposta, um plano de verdade para vocês dois.</p></header>
-    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-      {questions.map(q => {
-        const date = nextQuestionDate(q.id);
-        const replies = saved.filter(x => x.answer.questionId === q.id && x.answer.date === date);
-        return <button key={q.id} type="button" onClick={() => { playDuetSound('question', userId); choose(q.id); }}
-          aria-label={q.title} className={`rounded-2xl border p-4 text-left transition-transform active:scale-[.99] focus-visible:outline-2 focus-visible:outline-primary ${selected === q.id ? 'border-primary bg-secondary' : 'border-border bg-card hover:-translate-y-0.5'}`}>
-          <span aria-hidden="true" className="text-2xl">{q.id === 'friday' ? '🍝' : q.id === 'saturday' ? '🌿' : q.id === 'sunday' ? '☀️' : '📝'}</span>
-          <h2 className="mt-2 font-semibold">{q.title}</h2>
-          <span className="mt-1 block text-xs text-muted-foreground">{new Date(date + 'T12:00:00').toLocaleDateString('pt-BR', { day:'2-digit', month:'long' })}</span>
-          {replies.length > 0 && <span className="mt-2 flex items-center gap-1 text-xs text-primary"><CheckCircle2 size={13}/>{replies.length} {replies.length === 1 ? 'resposta' : 'respostas'}</span>}
-        </button>;
-      })}
+
+  const pending = proposals.filter(p => p.status !== 'agreed');
+  const agreed = proposals.filter(p => p.status === 'agreed');
+  const entries = [...pending, ...agreed].slice(0, showAll ? 100 : 16);
+  const visible = focusedProposal && !entries.some(p => p.id === focusedProposal)
+    ? [...proposals.filter(p => p.id === focusedProposal), ...entries] : entries;
+
+  return <section className="mx-auto max-w-2xl space-y-5" aria-label="Juntos, propostas e planos do casal">
+    <header>
+      <p className="text-xs font-semibold uppercase tracking-[.18em] text-primary">Juntos ♡</p>
+      <h1 className="mt-2 text-3xl font-semibold">Vamos decidir a dois?</h1>
+      <p className="mt-2 text-sm text-muted-foreground">Das coisinhas do dia até o próximo passeio. Uma ideia só vira plano quando {meName} e {partnerName} disserem sim.</p>
+    </header>
+
+    <div className="glass-panel rounded-3xl p-4 sm:p-5">
+      <h2 className="flex items-center gap-2 font-semibold"><Sparkles className="text-primary" size={18}/>O que podemos combinar?</h2>
+      <p className="mt-1 text-xs text-muted-foreground">Escolha uma sugestão ou escreva uma ideia de vocês.</p>
+      <div className="mt-4 flex gap-2 overflow-x-auto pb-2" aria-label="Categorias">
+        {['Todos', ...categories].map(item => <button type="button" key={item}
+          onClick={() => setCategory(item)}
+          aria-pressed={category === item}
+          className={`shrink-0 rounded-full border px-3 py-1.5 text-xs font-medium ${category === item ? 'border-primary bg-primary text-primary-foreground' : 'border-border bg-card'}`}>{item}</button>)}
+      </div>
+      <div className="mt-3 grid grid-cols-2 gap-2 sm:grid-cols-3">
+        {topIdeas.map(idea => <button type="button" key={idea.id}
+          onClick={() => chooseIdea(idea)}
+          aria-pressed={title === idea.title}
+          className={`rounded-2xl border p-3 text-left text-sm transition-transform active:scale-[.98] ${title === idea.title ? 'border-primary bg-secondary' : 'border-border bg-card/80'}`}>
+          <span aria-hidden="true" className="block text-xl">{idea.emoji}</span>
+          <span className="mt-2 block font-medium">{idea.title}</span>
+        </button>)}
+      </div>
+      <form onSubmit={propose} className="mt-4 space-y-3">
+        <label className="block text-sm font-medium">Sua proposta
+          <Input required maxLength={150} minLength={3} value={title} onChange={e => setTitle(e.target.value)}
+            placeholder="Ex.: Guacamole hoje?" className="mt-1.5"/>
+        </label>
+        <div className="grid grid-cols-2 gap-3">
+          <label className="block text-sm">Dia
+            <Input required type="date" min={newSuggestionDate()} value={date} onChange={e => setDate(e.target.value)} className="mt-1"/>
+          </label>
+          <label className="block text-sm">Horário
+            <Input required type="time" value={time} onChange={e => setTime(e.target.value)} className="mt-1"/>
+          </label>
+        </div>
+        <Button disabled={busy || title.trim().length < 3} className="w-full">
+          <Send size={16}/>{busy ? 'Enviando…' : 'Eu topo! Perguntar ao meu par'}
+        </Button>
+        <p className="text-xs text-muted-foreground">Seu sim fica registrado, mas a Agenda só muda depois do segundo sim.</p>
+      </form>
     </div>
+
+    <div className="rounded-3xl border border-border bg-card p-4">
+      <div className="flex items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 font-semibold"><Heart size={17} className="text-primary"/>Nossas decisões</h2>
+        <span className="text-xs text-muted-foreground">{pending.length} aguardando · {agreed.length} combinados</span>
+      </div>
+      {visible.map(proposal => {
+        const mine = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id === userId);
+        const theirs = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id !== userId);
+        const agreed = proposal.status === 'agreed';
+        const hasNo = proposal.status === 'declined';
+        return <article key={proposal.id} id={`proposal-${proposal.id}`}
+          className={`mt-3 rounded-2xl border p-3 ${focusedProposal === proposal.id ? 'border-primary bg-secondary/50' : 'border-border'}`}>
+          <div className="flex items-start justify-between gap-2">
+            <div>
+              <h3 className="font-semibold">{proposal.title}</h3>
+              <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock size={12}/>{new Date(proposal.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {proposal.time}</p>
+            </div>
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${agreed ? 'bg-green-100 text-green-800' : hasNo ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
+              {agreed ? 'Na Agenda ✓' : hasNo ? 'Não combinado' : 'Aguardando'}
+            </span>
+          </div>
+          <div className="mt-3 grid grid-cols-2 gap-2 text-xs" aria-label="Respostas individuais">
+            {[{ id: userId, name: meName, vote: mine }, { id: partner?.user_id, name: partnerName, vote: theirs }].map(person =>
+              <div key={person.id ?? person.name} className="rounded-xl bg-muted/70 px-2 py-2">
+                <span className="font-medium">{person.name}</span>
+                <span className="ml-1 text-muted-foreground">{person.vote ? person.vote.accepted ? '✓ Topou' : '✕ Não topou' : '· Ainda não respondeu'}</span>
+              </div>)}
+          </div>
+          {!agreed && <div className="mt-3 flex gap-2">
+            <Button type="button" size="sm" disabled={busy || mine?.accepted === true}
+              onClick={() => void respond(proposal.id, true)} className="flex-1"><ThumbsUp size={14}/>Topo!</Button>
+            <Button type="button" size="sm" variant="outline" disabled={busy || mine?.accepted === false}
+              onClick={() => void respond(proposal.id, false)} className="flex-1"><ThumbsDown size={14}/>Agora não</Button>
+          </div>}
+          {agreed && <p className="mt-2 flex items-center gap-1 text-xs text-primary"><CheckCheck size={14}/>Os dois toparam. O plano está na Agenda compartilhada.</p>}
+        </article>;
+      })}
+      {!proposals.length && <p className="mt-3 text-sm text-muted-foreground">Ainda não há propostas. Que tal começar com um guacamole hoje? 🥑</p>}
+      {proposals.length > 16 && !showAll && <Button variant="outline" className="mt-3 w-full" type="button" onClick={() => setShowAll(true)}>Ver mais propostas</Button>}
+    </div>
+
     <div className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="font-semibold">Um carinho durante o dia 💧</h2>
-      <p className="mt-1 text-sm text-muted-foreground">Já bebeu água hoje? Responda rapidinho para seu par.</p>
+      <h2 className="font-semibold">Um carinho no meio do dia 💧</h2>
+      <p className="mt-1 text-sm text-muted-foreground">Já bebeu água? Essa resposta vai ao chat, nunca à Agenda.</p>
       <div className="mt-3 flex flex-wrap gap-2">
         {['Sim, já bebi 💗', 'Ainda não 😅', 'Não sei 🤔'].map(label =>
-          <Button type="button" key={label} variant="outline" size="sm" disabled={busy} onClick={() => void quickReply(label, 'Já bebeu água hoje?')}>{label}</Button>)}
+          <Button key={label} type="button" variant="outline" size="sm" disabled={busy}
+            onClick={() => void quickReply(label)}>{label}</Button>)}
       </div>
-      <p className="mt-2 text-xs text-muted-foreground">Esta resposta é uma mensagem, não um compromisso na agenda.</p>
     </div>
-    {chosen && <form onSubmit={submit} className="space-y-4 rounded-2xl border border-primary/30 bg-card p-5">
-      <div className="flex items-center gap-2 text-primary"><Heart size={18}/><h2 className="font-semibold">{chosen.title}</h2></div>
-      <label className="block text-sm font-medium">Sua ideia
-        <Textarea required className="mt-2 min-h-24" maxLength={150} value={answer} onChange={e => setAnswer(e.target.value)} placeholder={chosen.example}/></label>
-      <div className="grid grid-cols-2 gap-3">
-        <label className="block text-sm">Dia <Input className="mt-1" required type="date" value={date} onChange={e => setDate(e.target.value)}/></label>
-        <label className="block text-sm">Horário <Input className="mt-1" required type="time" value={time} onChange={e => setTime(e.target.value)}/></label>
-      </div>
-      <p className="flex items-start gap-2 text-xs text-muted-foreground"><CalendarDays size={15} className="shrink-0"/>Ao salvar, sua resposta aparece no calendário compartilhado. Vocês podem ajustar a data depois.</p>
-      <div className="flex flex-wrap gap-2">
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void quickReply('Ainda não sei', chosen.title)}>Ainda não sei</Button>
-        <Button type="button" variant="outline" disabled={busy} onClick={() => void quickReply('Nada planejado por enquanto', chosen.title)}>Sem planos ainda</Button>
-      </div>
-      <Button className="w-full" disabled={busy || !answer.trim()}>{busy ? 'Salvando…' : 'Guardar nosso plano'} <Sparkles size={16}/></Button>
-    </form>}
-    <div className="rounded-2xl border border-border bg-card p-4">
-      <h2 className="flex items-center gap-2 font-semibold"><Clock size={17} className="text-primary"/>As ideias que já combinamos</h2>
-      {saved.slice(0, 14).map(({ row, answer: a }) => <div key={row.id} className="mt-3 border-t border-border pt-3">
-        <span className="text-xs text-primary">{name(a.by)} · {new Date(a.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {a.time}</span>
-        <p className="mt-1 text-sm">{a.answer}</p>
-      </div>)}
-      {!saved.length && <p className="mt-2 text-sm text-muted-foreground">Ainda não existem respostas. Qual vai ser o primeiro plano?</p>}
-    </div>
+    <p className="flex items-center gap-2 text-xs text-muted-foreground"><CalendarDays size={15}/>Só compromissos aceitos pelos dois aparecem em Agenda e Planos.</p>
   </section>;
 }
