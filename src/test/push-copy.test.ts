@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { currentReminderSlot, formatPartnerPush, formatQuickReplyPush, reminderMessage, reminderSlots } from '@/lib/push-copy';
+import { currentReminderSlot, formatPartnerPush, formatQuickReplyPush, formatChatPreviewPush, formatJuntosVotePush, reminderMessage, reminderSlots } from '@/lib/push-copy';
 
 describe('Duet notification presentation', () => {
   it('does not repeat Duet/actor in notification title and formats partner presence', () => {
@@ -24,6 +24,21 @@ describe('Duet notification presentation', () => {
     expect(formatQuickReplyPush('Daniel', 'Já bebeu água hoje? — Ainda não 😅')?.body).toMatch(/Daniel.*ainda não/);
     expect(formatQuickReplyPush('Letícia', 'Que passeio? — Ainda não sei')?.body).toMatch(/escolherem juntos/);
     expect(formatQuickReplyPush('Letícia', 'Mensagem secreta')).toBeNull();
+  });
+  it('shows the sender and the message text in the phone preview', () => {
+    expect(formatChatPreviewPush('Letícia', 'Quero guacamole hoje 🥑')).toEqual({
+      title: 'Letícia te mandou uma mensagem 💬',
+      body: 'Quero guacamole hoje 🥑',
+    });
+    expect(formatChatPreviewPush('Daniel', 'Oi\n  tudo bem?').body).toBe('Oi tudo bem?');
+    expect(formatChatPreviewPush('Daniel', 'x'.repeat(280)).body.length).toBe(198);
+    expect(formatChatPreviewPush('Daniel', '   ').body).toBe('Nova mensagem no Duet.');
+  });
+  it('distinguishes a first yes, a final mutual agreement, and a decline', () => {
+    expect(formatJuntosVotePush('Letícia', 'accepted', 'Guacamole hoje?').title).toMatch(/Letícia.*topou/);
+    expect(formatJuntosVotePush('Letícia', 'accepted', 'Guacamole hoje?').body).toMatch(/falta sua resposta/);
+    expect(formatJuntosVotePush('Daniel', 'agreed', 'Cinema').body).toMatch(/Agenda/);
+    expect(formatJuntosVotePush('Daniel', 'declined', 'Cinema').body).toMatch(/Histórico/);
   });
   it('maintains exact 20-minute boundaries across midnight in São Paulo', () => {
     const samples = [
