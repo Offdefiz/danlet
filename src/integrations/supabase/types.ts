@@ -44,6 +44,66 @@ export type Database = {
         }
         Relationships: []
       }
+      couple_proposals: {
+        Row: {
+          id: string
+          dedupe_key: string | null
+          title: string
+          date: string
+          time: string
+          created_by: string | null
+          status: string
+          record_id: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: {
+          id?: string
+          dedupe_key?: string | null
+          title: string
+          date: string
+          time: string
+          created_by?: string | null
+          status?: string
+          record_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Update: {
+          id?: string
+          dedupe_key?: string | null
+          title?: string
+          date?: string
+          time?: string
+          created_by?: string | null
+          status?: string
+          record_id?: string | null
+          created_at?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      couple_proposal_votes: {
+        Row: {
+          proposal_id: string
+          user_id: string
+          accepted: boolean
+          updated_at: string
+        }
+        Insert: {
+          proposal_id: string
+          user_id: string
+          accepted: boolean
+          updated_at?: string
+        }
+        Update: {
+          proposal_id?: string
+          user_id?: string
+          accepted?: boolean
+          updated_at?: string
+        }
+        Relationships: []
+      }
       couple_members: {
         Row: {
           person: string
@@ -383,6 +443,7 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      vote_duet_proposal: { Args: { p_proposal_id: string; p_accept: boolean }; Returns: string }
       claim_duet_push_events: {
         Args: never
         Returns: {
