@@ -11,7 +11,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
 import { onlineCooldowns } from '@/lib/notification-rules';
-import { syncPartnerNotifications } from '@/lib/notifications.functions';
+import { syncPartnerNotifications, sendSelfPushTest } from '@/lib/notifications.functions';
 import { playDuetSound } from '@/lib/duet-sounds';
 
 export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
@@ -109,6 +109,7 @@ export function PushButton({ userId, hideTrigger = false }: { userId: string; hi
   const [loaded, setLoaded] = useState(false);
   const [busy, setBusy] = useState(false);
   const [preferences, setPreferences] = useState({ enabled: true, additions: true, online: true, online_cooldown_minutes: 15 });
+  const sendTest = useServerFn(sendSelfPushTest);
   useEffect(() => {
     if (!open) return;
     let active = true; setLoaded(false);
@@ -141,7 +142,15 @@ export function PushButton({ userId, hideTrigger = false }: { userId: string; hi
       {!loaded ? <p role="status" className="text-sm text-muted-foreground">Abrindo preferências…</p> : <div className="space-y-5">
         {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Novas adições do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
         <label className="block text-sm">Intervalo entre avisos de presença<select aria-label="Intervalo entre avisos de presença" value={preferences.online_cooldown_minutes} disabled={busy || !preferences.enabled || !preferences.online} onChange={e => setPreferences(p => ({ ...p, online_cooldown_minutes: Number(e.target.value) }))} className="mt-2 h-10 w-full rounded-md border border-input bg-card px-3">{onlineCooldowns.map(value => <option key={value} value={value}>{value} minutos</option>)}</select></label>
-        <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => { setBusy(true); try { const status = await enablePush(userId); if (status === 'registered') toast.success(pushMsg[status]); else toast.error(pushMsg[status]); } catch { toast.error('Não foi possível ativar este aparelho.'); } finally { setBusy(false); } }}><Bell size={16}/>Ativar neste aparelho</Button><Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar preferências'}</Button></div>
+        <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => { setBusy(true); try { const status = await enablePush(userId); if (status === 'registered') toast.success(pushMsg[status]); else toast.error(pushMsg[status]); } catch { toast.error('Não foi possível ativar este aparelho.'); } finally { setBusy(false); } }}><Bell size={16}/>Ativar neste aparelho</Button><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => {
+          setBusy(true);
+          try {
+            const result = await sendTest();
+            if (result.sent > 0) toast.success('Firebase aceitou o envio. Confira a notificação no iPhone.');
+            else toast.error('Nenhum dispositivo habilitado recebeu o envio. Confira a inscrição deste aparelho.');
+          } catch (err) { toast.error(err instanceof Error ? err.message : 'Falha ao testar notificações.'); }
+          finally { setBusy(false); }
+        }}><Bell size={16}/>Enviar notificação de teste</Button><Button disabled={busy} onClick={save}>{busy ? 'Salvando…' : 'Salvar preferências'}</Button></div>
       </div>}
     </DialogContent></Dialog>
   </>;
