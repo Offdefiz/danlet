@@ -25,14 +25,14 @@ describe('Duet notification presentation', () => {
     expect(formatQuickReplyPush('Letícia', 'Que passeio? — Ainda não sei')?.body).toMatch(/escolherem juntos/);
     expect(formatQuickReplyPush('Letícia', 'Mensagem secreta')).toBeNull();
   });
-  it('creates varied, bounded reminders with daylight-only hours', () => {
-    expect(reminderSlots).toHaveLength(12);
-    expect(currentReminderSlot(new Date('2026-10-20T06:00:00Z'))).toBeNull(); // 03h Brazil
-    expect(currentReminderSlot(new Date('2026-10-20T13:30:00Z'))).toEqual({ id: 'h10', date: '2026-10-20' });
-    expect(currentReminderSlot(new Date('2026-10-20T16:00:00Z'))).toEqual({ id: 'h13', date: '2026-10-20' });
-    expect(currentReminderSlot(new Date('2026-10-20T22:00:00Z'))).toEqual({ id: 'h19', date: '2026-10-20' });
-    expect(currentReminderSlot(new Date('2026-10-21T00:30:00Z'))).toBeNull();
-    expect(currentReminderSlot(new Date('2026-10-21T01:00:00Z'))).toBeNull();
+  it('provides 72 twenty-minute slots over the full day without a daily ceiling', () => {
+    expect(reminderSlots).toHaveLength(72);
+    expect(currentReminderSlot(new Date('2026-10-20T06:00:00Z'))).toEqual({ id: 't03-00', date: '2026-10-20' }); // 03h Brazil
+    expect(currentReminderSlot(new Date('2026-10-20T13:30:00Z'))).toEqual({ id: 't10-20', date: '2026-10-20' });
+    expect(currentReminderSlot(new Date('2026-10-20T16:00:00Z'))).toEqual({ id: 't13-00', date: '2026-10-20' });
+    expect(currentReminderSlot(new Date('2026-10-20T22:00:00Z'))).toEqual({ id: 't19-00', date: '2026-10-20' });
+    expect(currentReminderSlot(new Date('2026-10-21T00:30:00Z'))).toEqual({ id: 't21-20', date: '2026-10-20' });
+    expect(currentReminderSlot(new Date('2026-10-21T01:00:00Z'))).toEqual({ id: 't22-00', date: '2026-10-20' });
     expect(reminderMessage('2026-10-20','cafe','couple-a').length).toBeGreaterThan(12);
     expect(reminderMessage('2026-10-20','manha')).toBe(reminderMessage('2026-10-20','manha'));
   });
