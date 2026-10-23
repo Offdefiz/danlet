@@ -524,3 +524,105 @@
     -webkit-backdrop-filter: none;
   }
 }
+
+/* Premium 03: Black Diamond — obsidian glass, silver flashes. */
+@layer base {
+[data-theme="black-diamond"] {
+  color-scheme: dark;
+  --background: #080D18; --foreground: #F4F6FC;
+  --card: #182134; --card-foreground: #F4F6FC;
+  --popover: #192236; --popover-foreground: #F4F6FC;
+  --primary: #C5D6F0; --primary-foreground: #111B2A;
+  --secondary: #2A3450; --secondary-foreground: #F2F6FF;
+  --muted: #252E43; --muted-foreground: #C7D3E9;
+  --accent: #556991; --accent-foreground: #FFFFFF;
+  --border: #677891; --input: #7C8EA7; --ring: #DFE9FA;
+  --success: #9AE1CF; --success-foreground: #0F2A25; --subtle: #CBD4E2;
+  --destructive: #FA9FB3; --destructive-foreground: #341727;
+  --danger: #FA9FB3; --warning: #F7D18B; --warning-foreground: #2B210E;
+}
+[data-theme="black-diamond"] body {
+  background:
+    radial-gradient(ellipse 55% 65% at 90% 18%, #788FC84D, transparent 72%),
+    radial-gradient(ellipse 65% 70% at 8% 88%, #3A51805C, transparent 72%),
+    linear-gradient(145deg,#050812,#131F36 45%,#060811 75%,#212D46);
+  background-attachment: fixed;
+}
+}
+[data-theme="black-diamond"] .glass-panel,
+[data-theme="black-diamond"] header.app-shell {
+  background: linear-gradient(145deg,#B9C9E027,#1A2639EB 35%,#0F1829E8 83%,#A6B7D31E);
+  border: 1px solid #B5C8EC6A;
+  box-shadow: inset 0 1px #EDF5FF80, 0 15px 32px #05060C88;
+  backdrop-filter: blur(25px) saturate(150%);
+}
+[data-theme="black-diamond"] .bg-card {
+  background: linear-gradient(146deg,#253048FA,#11192CF2);
+  box-shadow: inset 0 1px #DBE5FF33;
+}
+[data-theme="black-diamond"] .bg-primary {
+  background: linear-gradient(125deg,#F5FAFF,#8D9CAF 35%,#DAE6F7 62%,#758AA9 88%,#EFF4FB);
+  color: #111B2A;
+  box-shadow: inset 0 1px #FFFFFFCC, 0 7px 16px #080A13AA;
+}
+.duet-black-diamond-preview {
+  background: radial-gradient(circle at 32% 12%,#F9FDFF 0%,#A3B6DC 18%,transparent 53%),
+    linear-gradient(135deg,#0A0E1C,#506385 42%,#0D1121 73%,#AFC3DE);
+  border: 1px solid #B9CAE2; box-shadow: inset 0 1px #FFF8,0 4px 12px #080D1B66;
+}
+
+/* Premium 04: Champagne Gold — pearly metallic sheen and warm liquid glass. */
+@layer base {
+[data-theme="champagne-gold"] {
+  color-scheme: light;
+  --background: #F9F1E5; --foreground: #32271E;
+  --card: #FFF8EE; --card-foreground: #32271E;
+  --popover: #FFF8EF; --popover-foreground: #32271E;
+  --primary: #76501F; --primary-foreground: #FFFFFF;
+  --secondary: #EAD6B9; --secondary-foreground: #3F2C19;
+  --muted: #F3E5D2; --muted-foreground: #695238;
+  --accent: #D5B07B; --accent-foreground: #32261B;
+  --border: #B89B77; --input: #AF8D62; --ring: #8A642B;
+  --success: #4C7A61; --success-foreground: #FFFFFF;
+  --subtle: #71593B; --destructive: #AC4661; --destructive-foreground: #FFFFFF;
+  --danger: #AC4661; --warning: #9F681E; --warning-foreground: #FFFFFF;
+}
+[data-theme="champagne-gold"] body {
+  background: radial-gradient(ellipse 60% 65% at 5% 8%,#FFFBEF,transparent 73%),
+    radial-gradient(ellipse 50% 80% at 90% 82%,#DFBD8D88,transparent 70%),
+    linear-gradient(125deg,#FAF5EA,#E7CEAC 44%,#FFF8EB 68%,#ECD7BA);
+  background-attachment: fixed;
+}
+}
+[data-theme="champagne-gold"] .glass-panel,
+[data-theme="champagne-gold"] header.app-shell {
+  background: linear-gradient(142deg,#FFFFFFE5,#F2DFC4D9 30%,#FBF2E3E8 70%,#C69C6D73);
+  border: 1px solid #B59B77A6;
+  box-shadow: inset 0 1px #FFFFFF, 0 12px 27px #79552F2B;
+  backdrop-filter: blur(24px) saturate(148%);
+}
+[data-theme="champagne-gold"] .bg-primary {
+  background: linear-gradient(115deg,#705026,#A27740 20%,#6D481C 40%,#B28D56 65%,#705026);
+  color: #FFFFFF;
+  box-shadow: inset 0 1px #FFF5D76B,0 6px 14px #6B492956;
+}
+.duet-champagne-preview {
+  background: radial-gradient(circle at 25% 12%,#FFFFFF,#F0D8AE 28%,transparent 55%),
+    linear-gradient(130deg,#7C512B,#DBBD83 35%,#FDF5E0 56%,#A06B33 85%,#F4DFC0);
+  border: 1px solid #B99865;
+  box-shadow: inset 0 1px #FFF,0 3px 10px #77543155;
+}
+@media (max-width: 640px) and (pointer: coarse) {
+  /* All primary touch targets respect the ~44px mobile tap area. */
+  button, [role="button"], [role="tab"], [role="switch"], [role="checkbox"],
+  select, summary { min-height: 44px; touch-action: manipulation; }
+  button[size="icon"], button[aria-label] { min-width: 44px; }
+  input:not([type="checkbox"]):not([type="radio"]),textarea,select {
+    min-height: 44px; font-size: 16px; /* Prevent iOS input-focus zoom. */
+  }
+  .app-shell { width: min(100% - 1.25rem,1080px); }
+  .app-shell .text-\[11px\] { font-size: 12px; }
+}
+@supports (padding-bottom: env(safe-area-inset-bottom)) {
+  html { scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
+}
