@@ -26,6 +26,8 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
   const [busy, setBusy] = useState(false);
   const [focusedProposal, setFocusedProposal] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [showAllHistory, setShowAllHistory] = useState(false);
   const partner = members.find(member => member.user_id !== userId);
   const meName = members.find(member => member.user_id === userId)?.person || 'Você';
   const partnerName = partner?.person || 'Seu par';
@@ -68,7 +70,7 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
     if (busy || !title.trim()) return;
     if (!navigator.onLine) { toast.error('Sem internet para criar a proposta.'); return; }
     const duplicate = proposals.find(item => item.title.toLowerCase() === title.trim().toLowerCase()
-      && item.date === date && item.status !== 'agreed');
+      && item.date === date && item.status === 'pending');
     if (duplicate) { setFocusedProposal(duplicate.id); toast('Esta ideia já está no Juntos. Responda à proposta existente.'); return; }
     setBusy(true);
     try {
@@ -99,10 +101,11 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
       if (result.error) throw result.error;
       await onSaved();
       playDuetSound(accept ? 'success' : 'question', userId);
+      if (result.data === 'declined') setHistoryOpen(false);
       toast.success(result.data === 'agreed'
         ? 'Match dos dois! Agora sim, entrou na Agenda. ♡'
         : accept ? 'Seu sim foi salvo. Falta o sim de ' + partnerName + '.'
-          : 'Tudo bem! A proposta não vai entrar na Agenda.');
+          : 'Tudo bem! A proposta foi para o Histórico, fora dos planos ativos.');
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Falha ao responder à proposta.');
     } finally { setBusy(false); }
@@ -122,11 +125,21 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
     finally { setBusy(false); }
   }
 
-  const pending = proposals.filter(p => p.status !== 'agreed');
+  const today = newSuggestionDate();
+  // Old unanswered proposals are also archived so automatic ideas cannot
+  // accumulate forever on the couple's decision screen.
+  const expired = (p: Row<'couple_proposals'>) => p.status === 'pending' && p.date < today;
+  const pending = proposals.filter(p => p.status === 'pending' && !expired(p));
   const agreed = proposals.filter(p => p.status === 'agreed');
-  const entries = [...pending, ...agreed].slice(0, showAll ? 100 : 16);
+  const history = proposals.filter(p => p.status === 'declined' || expired(p));
+  const entries = pending.slice(0, showAll ? 100 : 16);
   const visible = focusedProposal && !entries.some(p => p.id === focusedProposal)
-    ? [...proposals.filter(p => p.id === focusedProposal), ...entries] : entries;
+    ? [...pending.filter(p => p.id === focusedProposal), ...entries] : entries;
+
+  useEffect(() => {
+    const selected = proposals.find(p => p.id === focusedProposal);
+    if (selected && (selected.status === 'declined' || expired(selected))) setHistoryOpen(true);
+  }, [focusedProposal, proposals, today]);
 
   return <section className="mx-auto max-w-2xl space-y-5" aria-label="Juntos, propostas e planos do casal">
     <header>
@@ -176,13 +189,12 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
     <div className="rounded-3xl border border-border bg-card p-4">
       <div className="flex items-center justify-between gap-2">
         <h2 className="flex items-center gap-2 font-semibold"><Heart size={17} className="text-primary"/>Nossas decisões</h2>
-        <span className="text-xs text-muted-foreground">{pending.length} aguardando · {agreed.length} combinados</span>
+        <span className="text-xs text-muted-foreground">{pending.length} aguardando · {agreed.length} na Agenda</span>
       </div>
       {visible.map(proposal => {
         const mine = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id === userId);
         const theirs = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id !== userId);
         const agreed = proposal.status === 'agreed';
-        const hasNo = proposal.status === 'declined';
         return <article key={proposal.id} id={`proposal-${proposal.id}`}
           className={`mt-3 rounded-2xl border p-3 ${focusedProposal === proposal.id ? 'border-primary bg-secondary/50' : 'border-border'}`}>
           <div className="flex items-start justify-between gap-2">
@@ -190,8 +202,8 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
               <h3 className="font-semibold">{proposal.title}</h3>
               <p className="mt-1 flex items-center gap-1 text-xs text-muted-foreground"><Clock size={12}/>{new Date(proposal.date + 'T12:00:00').toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })} às {proposal.time}</p>
             </div>
-            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${agreed ? 'bg-green-100 text-green-800' : hasNo ? 'bg-muted text-muted-foreground' : 'bg-secondary text-secondary-foreground'}`}>
-              {agreed ? 'Na Agenda ✓' : hasNo ? 'Não combinado' : 'Aguardando'}
+            <span className={`shrink-0 rounded-full px-2 py-1 text-[11px] font-semibold ${agreed ? 'bg-green-100 text-green-800' : 'bg-secondary text-secondary-foreground'}`}>
+              {agreed ? 'Na Agenda ✓' : 'Aguardando'}
             </span>
           </div>
           <div className="mt-3 grid grid-cols-2 gap-2 text-xs" aria-label="Respostas individuais">
@@ -210,8 +222,39 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
           {agreed && <p className="mt-2 flex items-center gap-1 text-xs text-primary"><CheckCheck size={14}/>Os dois toparam. O plano está na Agenda compartilhada.</p>}
         </article>;
       })}
-      {!proposals.length && <p className="mt-3 text-sm text-muted-foreground">Ainda não há propostas. Que tal começar com um guacamole hoje? 🥑</p>}
-      {proposals.length > 16 && !showAll && <Button variant="outline" className="mt-3 w-full" type="button" onClick={() => setShowAll(true)}>Ver mais propostas</Button>}
+      {!pending.length && <p className="mt-3 text-sm text-muted-foreground">Nenhuma proposta pendente agora. Que tal sugerir algo gostoso? 🥑</p>}
+      {pending.length > 16 && !showAll && <Button variant="outline" className="mt-3 w-full" type="button" onClick={() => setShowAll(true)}>Ver mais propostas</Button>}
+    </div>
+
+    <div className="rounded-2xl border border-border bg-card p-4">
+      <button type="button" className="flex w-full items-center justify-between gap-3 text-left"
+        aria-expanded={historyOpen} aria-controls="juntos-history"
+        onClick={() => setHistoryOpen(value => !value)}>
+        <span className="font-semibold">Histórico · Não combinamos</span>
+        <span className="text-xs text-muted-foreground">{history.length} {history.length === 1 ? 'ideia' : 'ideias'} · {historyOpen ? 'Fechar' : 'Ver histórico'}</span>
+      </button>
+      {historyOpen && <div id="juntos-history" className="mt-3 space-y-2">
+        <p className="text-xs text-muted-foreground">Propostas recusadas ou cujo dia já passou ficam guardadas aqui, sem ocupar a lista principal ou entrar na Agenda.</p>
+        {history.slice(0, showAllHistory ? 200 : 25).map(proposal => {
+          const mine = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id === userId);
+          const theirs = proposalVotes.find(v => v.proposal_id === proposal.id && v.user_id !== userId);
+          const old = expired(proposal);
+          return <article key={proposal.id} id={`proposal-${proposal.id}`}
+            className={`rounded-xl border border-border bg-muted/30 p-3 ${focusedProposal === proposal.id ? 'ring-2 ring-primary' : ''}`}>
+            <div className="flex items-start justify-between gap-3">
+              <h3 className="text-sm font-semibold">{proposal.title}</h3>
+              <span className="shrink-0 text-[11px] text-muted-foreground">{old ? 'Sem acordo · prazo passou' : 'Não combinado'}</span>
+            </div>
+            <p className="mt-1 text-xs text-muted-foreground">{new Date(proposal.date + 'T12:00:00').toLocaleDateString('pt-BR')} às {proposal.time}</p>
+            <p className="mt-2 text-xs text-muted-foreground">{meName}: {mine ? mine.accepted ? 'Topou' : 'Não topou' : 'Sem resposta'} · {partnerName}: {theirs ? theirs.accepted ? 'Topou' : 'Não topou' : 'Sem resposta'}</p>
+            {!old && <Button type="button" size="sm" variant="outline" className="mt-2" disabled={busy || mine?.accepted === true}
+              onClick={() => void respond(proposal.id, true)}>Reconsiderar e topar</Button>}
+          </article>;
+        })}
+        {!history.length && <p className="text-sm text-muted-foreground">Nenhuma ideia recusada ou vencida. ♡</p>}
+        {history.length > 25 && !showAllHistory && <Button type="button" variant="outline" className="w-full"
+          onClick={() => setShowAllHistory(true)}>Ver histórico completo</Button>}
+      </div>}
     </div>
 
     <div className="rounded-2xl border border-border bg-card p-4">
