@@ -71,6 +71,13 @@
       "when": 1792798500000,
       "tag": "0009_reliable_partner_events",
       "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "7",
+      "when": 1792799600000,
+      "tag": "0010_partner_message_previews_and_votes",
+      "breakpoints": true
     }
   ]
 }
