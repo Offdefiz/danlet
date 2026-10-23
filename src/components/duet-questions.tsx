@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react';
-import { CalendarDays, CheckCheck, Heart, Clock, Sparkles, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
+import { useServerFn } from '@tanstack/react-start';
+import { BellRing, CalendarDays, CheckCheck, Heart, Clock, Sparkles, Send, ThumbsDown, ThumbsUp } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
+import { resendJuntosProposal } from '@/lib/juntos-reminders.functions';
 import { playDuetSound } from '@/lib/duet-sounds';
 import { juntosIdeas, newSuggestionDate, parseProposalLink, proposalSection } from '@/lib/juntos-suggestions';
 import { parseQuestionLink } from '@/lib/weekend-prompts';
@@ -24,6 +26,8 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
   const [date, setDate] = useState(() => newSuggestionDate());
   const [time, setTime] = useState('19:30');
   const [busy, setBusy] = useState(false);
+  const [resendingId, setResendingId] = useState<string | null>(null);
+  const resend = useServerFn(resendJuntosProposal);
   const [focusedProposal, setFocusedProposal] = useState<string | null>(null);
   const [showAll, setShowAll] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
@@ -109,6 +113,27 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Falha ao responder à proposta.');
     } finally { setBusy(false); }
+  }
+
+  async function resendReminder(proposalId: string) {
+    if (resendingId || !navigator.onLine) {
+      if (!navigator.onLine) toast.error('Você está sem internet.');
+      return;
+    }
+    setResendingId(proposalId);
+    try {
+      const result = await resend({ data: { proposalId } });
+      if (result.sent > 0) {
+        playDuetSound('notification', userId);
+        toast.success('Notificação reenviada para ' + result.recipient + ' ♡');
+      } else {
+        toast.error('O aparelho do seu par não está aceitando push. Peça para ativar as notificações no Duet.');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível reenviar a notificação.');
+    } finally {
+      setResendingId(null);
+    }
   }
 
   async function quickReply(label: string) {
@@ -219,6 +244,14 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
             <Button type="button" size="sm" variant="outline" disabled={busy || mine?.accepted === false}
               onClick={() => void respond(proposal.id, false)} className="flex-1"><ThumbsDown size={14}/>Agora não</Button>
           </div>}
+          {!agreed && !theirs && partner && <Button type="button" size="sm" variant="ghost"
+            className="mt-2 w-full gap-2 border border-dashed border-border"
+            disabled={busy || resendingId !== null}
+            aria-label={`Reenviar notificação para ${partnerName}: ${proposal.title}`}
+            onClick={() => void resendReminder(proposal.id)}>
+            <BellRing size={15}/>
+            {resendingId === proposal.id ? 'Reenviando…' : `Reenviar notificação para ${partnerName}`}
+          </Button>}
           {agreed && <p className="mt-2 flex items-center gap-1 text-xs text-primary"><CheckCheck size={14}/>Os dois toparam. O plano está na Agenda compartilhada.</p>}
         </article>;
       })}
