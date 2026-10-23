@@ -57,6 +57,13 @@
       "when": 1792522800000,
       "tag": "0007_add_five_personal_themes",
       "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "7",
+      "when": 1792795200000,
+      "tag": "0008_juntos_mutual_proposals",
+      "breakpoints": true
     }
   ]
 }
