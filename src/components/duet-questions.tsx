@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { supabase } from '@/integrations/supabase/client';
 import { playDuetSound } from '@/lib/duet-sounds';
-import { juntosIdeas, newSuggestionDate, parseProposalLink } from '@/lib/juntos-suggestions';
+import { juntosIdeas, newSuggestionDate, parseProposalLink, proposalSection } from '@/lib/juntos-suggestions';
 import { parseQuestionLink } from '@/lib/weekend-prompts';
 import type { Row } from '@/lib/duet.types';
 
@@ -129,16 +129,16 @@ export function DuetQuestions({ proposals, proposalVotes, members, userId, onSav
   // Old unanswered proposals are also archived so automatic ideas cannot
   // accumulate forever on the couple's decision screen.
   const expired = (p: Row<'couple_proposals'>) => p.status === 'pending' && p.date < today;
-  const pending = proposals.filter(p => p.status === 'pending' && !expired(p));
-  const agreed = proposals.filter(p => p.status === 'agreed');
-  const history = proposals.filter(p => p.status === 'declined' || expired(p));
+  const pending = proposals.filter(p => proposalSection(p, today) === 'pending');
+  const agreed = proposals.filter(p => proposalSection(p, today) === 'agreed');
+  const history = proposals.filter(p => proposalSection(p, today) === 'history');
   const entries = pending.slice(0, showAll ? 100 : 16);
   const visible = focusedProposal && !entries.some(p => p.id === focusedProposal)
     ? [...pending.filter(p => p.id === focusedProposal), ...entries] : entries;
 
   useEffect(() => {
     const selected = proposals.find(p => p.id === focusedProposal);
-    if (selected && (selected.status === 'declined' || expired(selected))) setHistoryOpen(true);
+    if (selected && proposalSection(selected, today) === 'history') setHistoryOpen(true);
   }, [focusedProposal, proposals, today]);
 
   return <section className="mx-auto max-w-2xl space-y-5" aria-label="Juntos, propostas e planos do casal">
