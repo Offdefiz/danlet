@@ -28,7 +28,7 @@ export function useDuet(userId: string) {
   }, refetchOnWindowFocus: true });
   useEffect(() => {
     const channel = supabase.channel(`duet-${userId}`);
-    for (const table of ['records', 'references_catalog', 'votes', 'signatures', 'activity', 'messages', 'couple_proposals', 'couple_proposal_votes']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void cache.invalidateQueries({ queryKey: ['duet', userId] }));
+    for (const table of ['records', 'references_catalog', 'votes', 'signatures', 'activity', 'messages', 'profiles', 'couple_proposals', 'couple_proposal_votes']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, () => void cache.invalidateQueries({ queryKey: ['duet', userId] }));
     const drain = () => { void syncNotifications({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error)); };
     for (const table of ['records', 'references_catalog', 'messages', 'activity', 'profiles', 'couple_proposals', 'couple_proposal_votes']) channel.on('postgres_changes', { event: '*', schema: 'public', table }, drain);
     channel.subscribe(status => { if (status === 'SUBSCRIBED') void cache.invalidateQueries({ queryKey: ['duet', userId] }); });

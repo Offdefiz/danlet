@@ -14,6 +14,38 @@ export function formatPartnerPush(person: string, kind: string, eventBody: strin
   return { title, body: `${person} trouxe novidades para os planos de vocês. ♡` };
 }
 
+
+/** Message previews are explicitly enabled by the couple. Restrict the
+ * lock-screen payload to a brief text excerpt; never log message contents.
+ * iOS itself decides whether previews are visible while the phone is locked.
+ */
+export function formatChatPreviewPush(person: string, message: string): PushCopy {
+  const excerpt = Array.from(message, char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? ' ' : char).join('').replace(/\s+/g, ' ').trim();
+  return {
+    title: `${person} te mandou uma mensagem 💬`,
+    body: excerpt.length > 200 ? excerpt.slice(0, 197) + '…' : excerpt || 'Nova mensagem no Duet.',
+  };
+}
+
+/** An explicit vote event is generated after a verified Juntos response. */
+export function formatJuntosVotePush(
+  person: string, outcome: 'accepted' | 'declined' | 'agreed', proposalTitle: string,
+): PushCopy {
+  const title = proposalTitle.trim().slice(0, 120);
+  if (outcome === 'agreed') return {
+    title: `${person} topou! Plano confirmado ♡`,
+    body: `${title} — os dois aceitaram. Já está na Agenda.`,
+  };
+  if (outcome === 'accepted') return {
+    title: `${person} topou uma sugestão! ♡`,
+    body: `${title} — falta sua resposta para virar plano.`,
+  };
+  return {
+    title: `${person} respondeu ao Juntos`,
+    body: `${title} — não combinaram desta vez. A ideia foi ao Histórico.`,
+  };
+}
+
 // Little surprises unrelated to the planning/agenda area. No generative AI,
 // external API or fabricated claims about the partner are used.
 /** Only known, opt-in quick-answer formats appear on the partner's lock screen.

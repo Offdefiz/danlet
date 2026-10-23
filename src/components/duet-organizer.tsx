@@ -14,7 +14,9 @@ import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@
 import { DuetMusic } from '@/components/duet-music';
 import { findReferences, fetchPhoto, addFromInstagram } from '@/lib/duet.functions';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
-import { ThemePicker } from '@/components/duet-theme';
+import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
+import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
+import { prepareAvatarFile } from '@/lib/avatar-images';
 import { DuetAccountMenu } from '@/components/duet-account-menu';
 import { rankReferences, rankDiscoveredVenues } from '@/lib/duet-recommendations';
 import { DuetNotificationCenter } from '@/components/duet-notification-center';
@@ -171,9 +173,22 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     finally { setBusy(false); }
   }
   async function uploadAvatar(file: File) {
-    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { toast.error('Escolha uma imagem de até 10 MB.'); return; }
+    let photo: File;
+    try {
+      photo = await prepareAvatarFile(file);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível preparar a foto.');
+      return;
+    }
     const path = `${userId}/avatar-${crypto.randomUUID()}.jpg`;
-    await mutate(async () => { const sent = await supabase.storage.from('duet-photos').upload(path, file); if (sent.error) return sent; return supabase.from('profiles').update({ avatar_path: path }).eq('id', userId); });
+    const ok = await mutate(async () => {
+      const uploaded = await supabase.storage.from('duet-photos').upload(path, photo, {
+        contentType: 'image/jpeg', cacheControl: '3600',
+      });
+      if (uploaded.error) return uploaded;
+      return supabase.from('profiles').update({ avatar_path: path }).eq('id', userId);
+    });
+    if (ok) toast.success('Foto otimizada e atualizada ♡');
   }
   async function upload(file: File, ref: Row<'references_catalog'>) {
     if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { toast.error('Escolha uma imagem de até 10 MB.'); return; }
@@ -206,6 +221,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const recordsList = (items: Row<'records'>[], taskMode = false) => <div className="space-y-3">{items.map(r => <article key={r.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">{taskMode && <Button size="icon" variant={r.done ? 'success' : 'outline'} aria-label={`${r.done ? 'Desmarcar' : 'Concluir'} ${r.title}`} disabled={busy} onClick={() => void mutate(() => supabase.from('records').update({ done: !r.done, updated_by: userId }).eq('id', r.id).eq('version', r.version))}>{r.done && <Check/>}</Button>}<div className="min-w-0 flex-1"><h3 className={`font-medium ${r.done ? 'line-through text-muted-foreground' : ''}`}>{r.title}</h3>{r.body && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{r.body}</p>}<p className="mt-2 text-[11px] text-muted-foreground">{data.members.find(m => m.user_id === r.updated_by)?.person ?? 'Nós'} · {dateLabel(r.updated_at)}</p></div><Button size="icon" variant="ghost" title="Editar" aria-label={`Editar ${r.title}`} onClick={() => edit(r)}><Pencil size={14}/></Button><Button size="icon" variant="ghost" title="Excluir" aria-label={`Excluir ${r.title}`} disabled={busy} onClick={() => remove(r)}><Trash2 size={14}/></Button></article>)}</div>;
   return <div className="min-h-screen bg-background pb-32">
     <DuetWelcome userId={userId}/>
+    <DuetUpdatesDialog/>
     <header className="app-shell flex min-h-20 items-center justify-between gap-2 border-b border-border py-3">
       <div className="flex min-w-0 items-center gap-2"><Heart size={22} className="shrink-0 text-primary"/><span className="text-2xl font-bold">duet.</span></div>
       <Tutorial userId={userId}/>
@@ -217,7 +233,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <DuetAccountMenu name={me?.person ?? 'Nós'} profile={data.profiles.find(p => p.id === userId)} onProfile={() => setTab('profile')} onSignOut={() => void signOut()} online={online} sync={sync}/>
       </div>
     </header>{!online && <div role="status" className="app-shell mt-3 rounded-xl border border-warning/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">Você está sem internet. Suas alterações serão salvas quando a conexão voltar; confira antes de fechar o aplicativo.</div>}<main className="app-shell py-7 sm:py-10">
-    {tab === 'home' && <div className="space-y-9"><section className="border-b border-border pb-7"><p className="text-xs uppercase tracking-widest text-muted-foreground">Nosso espaço a dois</p><h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Oi, {me?.person}. <span className="text-primary">♡</span></h1><p className="mt-3 text-muted-foreground">O que vamos construir juntos hoje?</p><div className="mt-6 flex flex-wrap gap-2"><Button onClick={() => newRecord('task')}><Plus/>Próximo passo</Button><Button variant="outline" onClick={() => newRecord('note')}><Pencil/>Anotar</Button></div><Button variant="outline" className="mt-3" onClick={() => {playDuetSound('question',userId);setTab('together');}}><Heart size={16}/> Vamos combinar nosso fim de semana?</Button></section><DuetHighlights records={data.records} references={data.references} votes={data.votes} userId={userId} onNavigate={setTab}/><section className="garden-band flex flex-wrap items-center justify-between gap-6 border-y border-border py-7"><div><div className="flex items-center gap-2 text-success"><Flower2 size={18}/><span className="text-xs uppercase tracking-widest">Nosso casamento</span></div><h2 className="mt-3 text-2xl font-semibold">Um sim, do nosso jeito.</h2><p className="mt-2 text-sm text-muted-foreground">English Garden · flores, jardim e nós dois</p><Button variant="link" className="mt-3 px-0" onClick={() => { setCategory('Locais'); setTab('dream'); }}>Encontrar nosso lugar <Heart size={15}/></Button></div><div className="text-right"><p className="text-sm font-medium">{days === null ? 'A data ainda é nossa escolha' : `${days} dias para o nosso sim`}</p><Button variant="ghost" className="mt-2 text-xs" onClick={() => weddingDate ? edit(weddingDate) : setForm({ kind: 'setting', title: 'Data do casamento', body: '', period: periods[0] ?? '' })}><Pencil size={13}/>{weddingDate ? 'Editar data' : 'Definir data'}</Button></div></section><section><Section title="Próximos passos" action={<Button variant="ghost" size="icon" title="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Um próximo passo de cada vez." action="Adicionar primeiro passo" onClick={() => newRecord('task')}/>}</section><section><Section title="Nosso caderno" action={<Button variant="ghost" size="icon" title="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Espaço para o que não queremos esquecer." action="Escrever uma anotação" onClick={() => newRecord('note')}/>}</section><DuetMusic records={data.records} userId={userId}/><section className="flex items-center justify-between border-t border-border pt-6"><div><p className="font-medium">Nossos planos</p><p className="mt-1 text-sm text-muted-foreground">{goals.length ? `${complete} de ${goals.length} metas concluídas pelos dois` : 'Nenhuma meta definida ainda'}</p></div><Button variant="outline" onClick={() => setTab('plans')}>Ver planos</Button></section><section><Section title="Últimas atualizações"/>{data.activity.slice(0,5).map(a => <div key={a.id} className="flex justify-between gap-4 border-b border-border py-3 text-xs text-muted-foreground"><span>{data.members.find(m => m.user_id === a.actor_id)?.person ?? 'Nós'} · {a.entity_type === 'votes' ? 'avaliou uma referência' : a.entity_type === 'signatures' ? 'assinou uma meta' : a.action === 'DELETE' ? 'excluiu um registro' : 'atualizou nossos planos'}</span><span>{dateLabel(a.created_at)}</span></div>)}{!data.activity.length && <p className="text-sm text-muted-foreground">Nossas atualizações aparecerão aqui.</p>}</section></div>}
+    {tab === 'home' && <div className="space-y-9"><section className="border-b border-border pb-7"><p className="text-xs uppercase tracking-widest text-muted-foreground">Nosso espaço a dois</p><h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Oi, {me?.person}. <span className="text-primary">♡</span></h1><p className="mt-3 text-muted-foreground">O que vamos construir juntos hoje?</p><div className="mt-6 flex flex-wrap gap-2"><Button onClick={() => newRecord('task')}><Plus/>Próximo passo</Button><Button variant="outline" onClick={() => newRecord('note')}><Pencil/>Anotar</Button></div><Button variant="outline" className="mt-3" onClick={() => {playDuetSound('question',userId);setTab('together');}}><Heart size={16}/> Vamos combinar nosso fim de semana?</Button></section><DuetHighlights records={data.records} references={data.references} votes={data.votes} userId={userId} onNavigate={setTab}/><DuetUpdatesPreview/><section className="garden-band flex flex-wrap items-center justify-between gap-6 border-y border-border py-7"><div><div className="flex items-center gap-2 text-success"><Flower2 size={18}/><span className="text-xs uppercase tracking-widest">Nosso casamento</span></div><h2 className="mt-3 text-2xl font-semibold">Um sim, do nosso jeito.</h2><p className="mt-2 text-sm text-muted-foreground">English Garden · flores, jardim e nós dois</p><Button variant="link" className="mt-3 px-0" onClick={() => { setCategory('Locais'); setTab('dream'); }}>Encontrar nosso lugar <Heart size={15}/></Button></div><div className="text-right"><p className="text-sm font-medium">{days === null ? 'A data ainda é nossa escolha' : `${days} dias para o nosso sim`}</p><Button variant="ghost" className="mt-2 text-xs" onClick={() => weddingDate ? edit(weddingDate) : setForm({ kind: 'setting', title: 'Data do casamento', body: '', period: periods[0] ?? '' })}><Pencil size={13}/>{weddingDate ? 'Editar data' : 'Definir data'}</Button></div></section><section><Section title="Próximos passos" action={<Button variant="ghost" size="icon" title="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Um próximo passo de cada vez." action="Adicionar primeiro passo" onClick={() => newRecord('task')}/>}</section><section><Section title="Nosso caderno" action={<Button variant="ghost" size="icon" title="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Espaço para o que não queremos esquecer." action="Escrever uma anotação" onClick={() => newRecord('note')}/>}</section><DuetMusic records={data.records} userId={userId}/><section className="flex items-center justify-between border-t border-border pt-6"><div><p className="font-medium">Nossos planos</p><p className="mt-1 text-sm text-muted-foreground">{goals.length ? `${complete} de ${goals.length} metas concluídas pelos dois` : 'Nenhuma meta definida ainda'}</p></div><Button variant="outline" onClick={() => setTab('plans')}>Ver planos</Button></section><section><Section title="Últimas atualizações"/>{data.activity.slice(0,5).map(a => <div key={a.id} className="flex justify-between gap-4 border-b border-border py-3 text-xs text-muted-foreground"><span>{data.members.find(m => m.user_id === a.actor_id)?.person ?? 'Nós'} · {a.entity_type === 'votes' ? 'avaliou uma referência' : a.entity_type === 'signatures' ? 'assinou uma meta' : a.action === 'DELETE' ? 'excluiu um registro' : 'atualizou nossos planos'}</span><span>{dateLabel(a.created_at)}</span></div>)}{!data.activity.length && <p className="text-sm text-muted-foreground">Nossas atualizações aparecerão aqui.</p>}</section></div>}
     {tab === 'dream' && <div className="mx-auto max-w-xl"><p className="text-xs uppercase tracking-widest text-muted-foreground">Descobertas a dois</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Dream Match <span className="text-primary">♡</span></h1><Button variant="ghost" size="icon" title="Adicionar referência" aria-label="Adicionar referência" onClick={() => setAddReference(true)}><Plus/></Button></div><div className="my-5 flex flex-wrap gap-2">{categories.map(c => <Button key={c} variant={category === c ? 'default' : 'outline'} onClick={() => { setCategory(c); setCity(''); setState(''); setScenery(''); }} className="text-xs">{c}</Button>)}</div><div className="mb-4 grid grid-cols-3 gap-2"><Select label="Estado" value={state} onChange={v => { setState(v); setCity(''); }} options={[...new Set(data.references.filter(r => r.category === category).map(r => r.state).filter(Boolean))]}/><Select label="Cidade" value={city} onChange={setCity} options={[...new Set(data.references.filter(r => r.category === category && (!state || r.state === state)).map(r => r.city).filter(Boolean))]}/><Select label="Cenário" value={scenery} onChange={setScenery} options={[...new Set(refs.map(r => r.scenery).filter(Boolean))]}/></div><div className="mb-5 flex justify-between gap-2"><Button variant="ghost" className="px-0 text-xs" onClick={() => setHistory(!history)}>{history ? <ArrowLeft/> : <BookHeart/>}{history ? 'Voltar às descobertas' : 'Nosso histórico'}</Button><Button variant="outline" className="text-xs" onClick={() => setSearchOpen(true)}><Search/>Buscar novas opções</Button></div>
       {!history && <section aria-label="Sugestões para o casal" className="mb-5 rounded-2xl border border-border bg-card p-4">
         <h2 className="text-sm font-semibold">Sugestões para vocês ♡</h2>
@@ -235,14 +251,23 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     {tab === 'together' && <DuetQuestions userId={userId} proposals={data.proposals} proposalVotes={data.proposalVotes} members={data.members} onSaved={() => cache.invalidateQueries({ queryKey: ['duet', userId] })}/>}
     {tab === 'calendar' && <DuetCalendar userId={userId} records={data.records} onSaved={() => cache.invalidateQueries({ queryKey: ['duet', userId] })}/>}
     {tab === 'list' && <section className="mx-auto max-w-2xl space-y-6"><h1 className="text-3xl font-semibold">Nossa lista</h1><p className="text-sm text-muted-foreground">Tarefas e anotações do casal, num só lugar.</p><Section title="Tarefas" action={<Button size="icon" variant="outline" aria-label="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Ainda não há tarefas." action="Adicionar tarefa" onClick={() => newRecord('task')}/>}<Section title="Anotações" action={<Button size="icon" variant="outline" aria-label="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Ainda não há anotações." action="Adicionar anotação" onClick={() => newRecord('note')}/>}</section>}
-    {tab === 'profile' && <section className="mx-auto max-w-xl space-y-5">
-      <h1 className="text-3xl font-semibold">Meu perfil</h1>
-      <div className="rounded-2xl border border-border bg-card p-6">
-        <div className="flex items-center gap-4">
-          <Avatar size={64} profile={data.profiles.find(p => p.id === userId)} name={me?.person ?? '?'} onPick={f => void uploadAvatar(f)}/>
-          <div><p className="text-lg font-semibold">{me?.person}</p><p className="text-xs text-muted-foreground">Toque na foto para trocar · até 10 MB</p></div>
+    {tab === 'profile' && <section className="mx-auto max-w-2xl space-y-5">
+      <div className="space-y-1"><p className="text-xs font-semibold uppercase tracking-[.2em] text-primary">Um espaço só seu</p><h1 className="text-3xl font-semibold">Meu perfil ♡</h1></div>
+      <div className="glass-panel relative overflow-hidden rounded-[28px] p-5 sm:p-7">
+        <div className="pointer-events-none absolute -right-16 -top-24 h-64 w-64 rounded-full bg-primary/10 blur-3xl"/>
+        <div className="relative flex flex-col items-center gap-4 text-center sm:flex-row sm:items-center sm:text-left">
+          <Avatar size={116} profile={data.profiles.find(p => p.id === userId)} name={me?.person ?? '?'} onPick={f => void uploadAvatar(f)}/>
+          <div className="min-w-0 flex-1">
+            <span className="inline-flex items-center rounded-full bg-secondary px-3 py-1 text-xs font-semibold text-secondary-foreground">Conta privada do casal</span>
+            <h2 className="mt-3 break-words text-2xl font-semibold">{data.profiles.find(p => p.id === userId)?.display_name || me?.person || 'Meu espaço'}</h2>
+            <p className="mt-1 text-sm text-muted-foreground">Daniel & Letícia · Duet</p>
+            <p className="mt-2 text-xs text-muted-foreground">Toque na foto para trocar · fotos otimizadas para celular, até 10 MB antes da compressão.</p>
+          </div>
         </div>
-        <form className="mt-6 space-y-3" onSubmit={async e => {
+      </div>
+      <div className="rounded-3xl border border-border bg-card p-5 sm:p-6">
+        <h2 className="font-semibold">Como quer aparecer?</h2>
+        <form className="mt-3 space-y-3" onSubmit={async e => {
           e.preventDefault();
           const display_name = (nameEditor ?? '').trim();
           if (!display_name) return;
@@ -251,20 +276,26 @@ export function DuetOrganizer({ userId }: { userId: string }) {
             toast.success('Nome de exibição atualizado.');
           }
         }}>
-          <label className="block text-sm">Nome de exibição<Input className="mt-2" value={nameEditor ?? data.profiles.find(p => p.id === userId)?.display_name ?? me?.person ?? ''} maxLength={80} onChange={e => setNameEditor(e.target.value)} /></label>
-          <Button type="submit" disabled={busy || nameEditor === null || !nameEditor.trim()}>Salvar nome</Button>
+          <label className="block text-sm font-medium">Nome de exibição
+            <Input className="mt-2" value={nameEditor ?? data.profiles.find(p => p.id === userId)?.display_name ?? me?.person ?? ''}
+              maxLength={80} onChange={e => setNameEditor(e.target.value)} placeholder="Como gosta de ser chamado?"/>
+          </label>
+          <Button type="submit" className="min-h-11 w-full sm:w-auto" disabled={busy || nameEditor === null || !nameEditor.trim()}>Salvar meu nome</Button>
         </form>
       </div>
-      <div className="rounded-2xl border border-border bg-card p-5">
-        <h2 className="font-semibold">Minhas preferências</h2>
-        <p className="mt-1 text-sm text-muted-foreground">Escolha as cores do seu aparelho e configure os avisos que recebe.</p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button variant="outline" onClick={() => window.dispatchEvent(new Event('duet:open-theme'))}>Alterar tema</Button>
-          <Button variant="outline" onClick={() => window.dispatchEvent(new Event('duet:open-notifications'))}>Notificações</Button>
+      <div className="rounded-3xl border border-border bg-card p-5 sm:p-6">
+        <h2 className="text-lg font-semibold">Meu Duet, do meu jeito</h2>
+        <p className="mt-1 text-sm text-muted-foreground">Seu visual e suas notificações não mudam o aparelho da outra pessoa.</p>
+        <p className="mt-3 text-sm"><span className="text-muted-foreground">Tema ativo:</span> <strong>{themes.find(t => t.id === readPersonalTheme(userId))?.label ?? 'Romântico original'}</strong></p>
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <Button className="min-h-12" variant="outline" onClick={() => window.dispatchEvent(new Event('duet:open-theme'))}>Escolher tema</Button>
+          <Button className="min-h-12" variant="outline" onClick={() => window.dispatchEvent(new Event('duet:open-notifications'))}>Minhas notificações</Button>
+          <Button className="min-h-12 sm:col-span-2" variant="secondary" onClick={openDuetUpdates}>Novidades e histórico de versões</Button>
         </div>
+        <p className="mt-3 text-xs text-muted-foreground">As mensagens podem aparecer como prévia nas notificações do sistema. Ajuste a exibição de prévias nas configurações do iPhone para maior privacidade.</p>
       </div>
     </section>}
-    {tab === 'plans' && <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Um passo de cada vez</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Nossos planos <span className="text-primary">♡</span></h1><Button size="icon" title="Adicionar meta" aria-label="Adicionar meta" onClick={() => newRecord('goal')}><Plus/></Button></div>{data.proposals.some(proposal => proposal.status === 'agreed') && <section className="mt-5 rounded-2xl border border-border bg-card p-4">
+        {tab === 'plans' && <div><p className="text-xs uppercase tracking-widest text-muted-foreground">Um passo de cada vez</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Nossos planos <span className="text-primary">♡</span></h1><Button size="icon" title="Adicionar meta" aria-label="Adicionar meta" onClick={() => newRecord('goal')}><Plus/></Button></div>{data.proposals.some(proposal => proposal.status === 'agreed') && <section className="mt-5 rounded-2xl border border-border bg-card p-4">
       <h2 className="flex items-center gap-2 font-semibold"><CheckCheck className="text-success" size={18}/>Combinados no Juntos</h2>
       <p className="mt-1 text-xs text-muted-foreground">Somente propostas aceitas por Daniel e Letícia.</p>
       <div className="mt-3 grid gap-2 sm:grid-cols-2">
@@ -288,6 +319,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     <Button variant="outline" onClick={() => {setTab('plans');setMoreOpen(false);}}><ListChecks size={18}/> Planos e metas</Button>
     <Button variant="outline" onClick={() => {setTab('list');setMoreOpen(false);}}><BookHeart size={18}/> Lista e anotações</Button>
     <Button variant="outline" onClick={() => {setTab('profile');setMoreOpen(false);}}><UserRound size={18}/> Meu perfil</Button>
+    <Button variant="outline" onClick={() => {openDuetUpdates();setMoreOpen(false);}}>Novidades do Duet</Button>
     <Button onClick={() => {setQuickAddOpen(true);setMoreOpen(false);}}><Plus size={18}/> Adicionar algo</Button>
   </div></DialogContent></Dialog>
   <Dialog open={quickAddOpen} onOpenChange={setQuickAddOpen}><DialogContent>
