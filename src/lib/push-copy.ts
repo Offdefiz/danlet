@@ -69,26 +69,67 @@ export const sweetReminders = [
   'Não é cobrança, é só o Duet fazendo companhia no dia. 🌸',
   'Uma mensagem divertida pode ser o encontro de cinco segundos de hoje. 📱',
   'A fofoca do dia: um simples oi continua sendo uma ótima ideia. 👀',
+  'Escolham uma música para a trilha sonora de hoje. 🎧',
+  'Uma perguntinha: o que faria a nossa tarde mais gostosa? 🌤️',
+  'Que tal compartilhar uma receita para testar juntos? 🍽️',
+  'Vale combinar quem prepara o café da próxima vez. ☕',
+  'Um lembrete de casal: a lista de compras não se faz sozinha. 🛒',
+  'Vocês já decidiram o que vão assistir esta semana? 🎬',
+  'Que tal escolher um passeio simples para o próximo dia livre? 🚶',
+  'Hoje combina com uma piada interna que só vocês entendem. 😄',
+  'Uma foto antiga pode render uma conversa muito boa. 📷',
+  'Um recadinho gentil pode chegar na hora certa. 💬',
+  'O Duet sugere: cinco minutos para planejar algo divertido. 🗓️',
+  'Vale conferir se tem algum compromisso importante chegando. 📅',
+  'Uma pergunta para os dois: qual comida bateu vontade hoje? 🥑',
+  'Um pouquinho de descanso compartilhado também é programa. 🛋️',
+  'Dois minutos para escolher uma sobremesa? 🍫',
+  'Já contaram um ao outro a melhor parte do dia? ✨',
+  'Um desafio simples: escolher um lugar novo para conhecer. 🧭',
+  'Que tal deixar a roupa do passeio separada com antecedência? 👕',
+  'Um bilhetinho surpresa nunca sai de moda. 💌',
+  'O Duet aprovou um cafuné fora de hora. 🤍',
+  'Lembrete leve: o plano mais gostoso pode ser ficar em casa. 🏡',
+  'Que tal pensar no cardápio do próximo jantar? 🍝',
+  'Hoje vale escolher uma lembrança favorita do casal. 🌷',
+  'Vocês merecem conversar sobre o que querem fazer no fim de semana. ☀️',
+  'Pausa rápida: que tal beber uma água e mandar um carinho? 💧',
+  'A próxima música da playlist pode ser escolhida a dois. 🎶',
+  'Uma ideia boba às vezes vira uma noite inesquecível. 🌙',
+  'Boletim especial: um elogio sincero é sempre bem-vindo. 💗',
+  'Já existe alguma tarefa da casa para dividir melhor? 🧺',
+  'Que tal conferir os planos de amanhã juntos? 📆',
+  'Sugestão do Duet: uma caminhada para conversar sem pressa. 🌿',
+  'Vale reservar um tempinho para ver fotos antigas. 📸',
+  'Uma pergunta diferente: qual foi a risada favorita da semana? 😂',
+  'O Duet recomenda: escolher um filme de surpresa. 🍿',
+  'Que tal mandar uma mensagem agradecendo uma coisa pequena? 💞',
+  'Até um lanche improvisado pode virar encontro. 🥪',
 ] as const;
 
-// Scheduler checks every twenty minutes; one proactive push per São Paulo local-hour
-// slot (09:00–20:59), at most twelve per subscribed recipient per day.
-export const reminderSlots = Array.from({ length: 12 }, (_, index) => ({
-  id: 'h' + String(index + 9).padStart(2, '0'),
-  startHour: index + 9,
-  endHour: index + 10,
-}));
+// The cron runs every ~20 minutes in São Paulo time, including overnight.
+// Slots describe the requested frequency, not an extra daily quota.
+// Idempotent IDs prevent the same slot being sent twice on scheduler retries.
+export const reminderSlots = Array.from({ length: 24 * 3 }, (_, index) => {
+  const hour = Math.floor(index / 3);
+  const minute = (index % 3) * 20;
+  return {
+    id: 't' + String(hour).padStart(2, '0') + '-' + String(minute).padStart(2, '0'),
+    hour, minute,
+  };
+});
 
-/** Up to twelve opt-out reminders/day; never overnight (America/Sao_Paulo). */
+/** São Paulo wall-clock slot; 72 eligible windows per full 24-hour day. */
 export function currentReminderSlot(now: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo',
     year: 'numeric', month: '2-digit', day: '2-digit', hour: '2-digit',
-    hourCycle: 'h23',
+    minute: '2-digit', hourCycle: 'h23',
   }).formatToParts(now);
   const item = (type: string) => parts.find(p => p.type === type)?.value ?? '';
   const hour = Number(item('hour'));
-  const slot = reminderSlots.find(s => hour >= s.startHour && hour < s.endHour);
+  const minute = Number(item('minute'));
+  const slot = reminderSlots[hour * 3 + Math.floor(minute / 20)];
   return slot ? { id: slot.id, date: `${item('year')}-${item('month')}-${item('day')}` } : null;
 }
 

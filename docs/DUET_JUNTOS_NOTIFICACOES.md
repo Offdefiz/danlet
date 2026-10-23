@@ -1,5 +1,11 @@
 # Duet — Juntos, som e notificações interativas
 
+## Cadência atual — 20 minutos sem teto diário
+
+**Atualizada em 23/10/2026:** o agendador opera aproximadamente a cada **20 minutos nas 24 horas do dia** (72 janelas diárias por pessoa), inclusive madrugada. Não há teto artificial por dia nem supressão por presença no app. Frases rotativas permitem surpresas diferentes a cada janela, e seis horários específicos do dia trazem sugestões de atividades que exigem dois “sim” antes de virar plano. Ainda há deduplicação por janela, opção individual para desligar push, dependência das permissões iOS e limites técnicos das plataformas. Os horários podem variar por atrasos do GitHub Actions.
+
+**As referências abaixo a cinco ou doze envios e a horários exclusivamente diurnos são históricas e não representam mais a configuração atual.**
+
 ## Experiência
 A barra inferior agora apresenta **Início / Dream Match / Juntos / Agenda / Mais**. O menu **Mais** mantém acessíveis as funcionalidades existentes: Planos e metas, Lista e anotações, Perfil e Adicionar. O cabeçalho permanece com conversa, sino, tutorial, tema e configurações.
 

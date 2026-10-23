@@ -27,13 +27,13 @@ describe('Duet interactive plans', () => {
   it('does not create a calendar plan without an answer', () => {
     expect(() => makeAnswerRecord({questionId:'friday',date:'2026-10-23',time:'19:30',answer:'  ',by:'abc'})).toThrow();
   });
-  it('provides twelve daytime windows without night alerts', () => {
-    expect(currentReminderSlot(new Date('2026-10-22T12:00:00Z'))?.id).toBe('h09');
-    expect(currentReminderSlot(new Date('2026-10-22T15:00:00Z'))?.id).toBe('h12');
-    expect(currentReminderSlot(new Date('2026-10-22T18:00:00Z'))?.id).toBe('h15');
-    expect(currentReminderSlot(new Date('2026-10-22T22:00:00Z'))?.id).toBe('h19');
-    expect(currentReminderSlot(new Date('2026-10-23T00:30:00Z'))).toBeNull();
-    expect(currentReminderSlot(new Date('2026-10-23T02:00:00Z'))).toBeNull();
+  it('runs every twenty minutes even outside daytime', () => {
+    expect(currentReminderSlot(new Date('2026-10-22T12:00:00Z'))?.id).toBe('t09-00');
+    expect(currentReminderSlot(new Date('2026-10-22T15:00:00Z'))?.id).toBe('t12-00');
+    expect(currentReminderSlot(new Date('2026-10-22T18:00:00Z'))?.id).toBe('t15-00');
+    expect(currentReminderSlot(new Date('2026-10-22T22:00:00Z'))?.id).toBe('t19-00');
+    expect(currentReminderSlot(new Date('2026-10-23T00:30:00Z'))?.id).toBe('t21-20');
+    expect(currentReminderSlot(new Date('2026-10-23T02:00:00Z'))?.id).toBe('t23-00');
     expect(questions).toHaveLength(4);
   });
   it('schedules the Friday question in the Friday morning slot', () => {
