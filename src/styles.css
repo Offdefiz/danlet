@@ -343,3 +343,184 @@
 @media (prefers-contrast: more) {
   .glass-panel { background: var(--card); backdrop-filter: none; -webkit-backdrop-filter: none; }
 }
+
+
+/* METALLIC PURPLE — glossy liquid chrome. Opt-in, per device/account.
+   No images, WebGL or network fetches; all highlights are CSS and ignore taps. */
+@layer base {
+  [data-theme="metallic-purple"] {
+    color-scheme: dark;
+    --background: #10091F;
+    --foreground: #F7F1FF;
+    --card: #241738;
+    --card-foreground: #F7F1FF;
+    --popover: #241735;
+    --popover-foreground: #F7F1FF;
+    --primary: #C8ABFF;
+    --primary-foreground: #1B1033;
+    --secondary: #392950;
+    --secondary-foreground: #F4EBFF;
+    --muted: #322343;
+    --muted-foreground: #D0C1E3;
+    --accent: #7252A9;
+    --accent-foreground: #FFFFFF;
+    --destructive: #F08DAA;
+    --destructive-foreground: #2A1120;
+    --border: #71588E;
+    --input: #80699E;
+    --ring: #D5B9FF;
+    --success: #85E1C1;
+    --success-foreground: #0B2A25;
+    --danger: #F08DAA;
+    --warning: #FFCF83;
+    --warning-foreground: #33200B;
+    --subtle: #C5B7DA;
+  }
+
+  [data-theme="metallic-purple"] body {
+    background-color: var(--background);
+    background-image:
+      radial-gradient(ellipse 62% 48% at 18% 9%, #A17AE280 0%, #4B28726B 40%, transparent 78%),
+      radial-gradient(ellipse 50% 60% at 91% 34%, #AF8AF28A 0%, #4A236F77 37%, transparent 80%),
+      radial-gradient(ellipse 55% 60% at 30% 90%, #4D2A8EAE 0%, transparent 73%),
+      linear-gradient(138deg, #0D0919 5%, #29173C 36%, #0B0A1D 62%, #281344 100%);
+    background-size: 150% 160%, 165% 145%, 155% 145%, 100% 100%;
+    background-position: 0% 20%, 100% 30%, 15% 100%, center;
+    background-attachment: fixed;
+    animation: duet-liquid-purple-flow 22s ease-in-out infinite alternate;
+  }
+  [data-theme="metallic-purple"] body::before {
+    content: "";
+    position: fixed;
+    inset: -15%;
+    pointer-events: none;
+    z-index: 0;
+    opacity: .5;
+    background:
+      conic-gradient(from 135deg at 37% 45%, transparent 0deg, #F5E7FF16 38deg,
+        transparent 68deg, #BFA4FF19 104deg, transparent 151deg,
+        #C6A4E918 206deg, transparent 258deg, #F7E8FF16 315deg, transparent 360deg);
+    filter: blur(38px);
+    animation: duet-liquid-purple-shimmer 28s ease-in-out infinite alternate;
+  }
+  [data-theme="metallic-purple"] body > * { position: relative; z-index: 1; }
+}
+
+/* Panels are dark glass with a curved metal highlight, not opaque purple boxes. */
+[data-theme="metallic-purple"] .glass-panel {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  color: var(--foreground);
+  background:
+    linear-gradient(146deg, #EDDCFF2B 0%, #8F63C624 13%, #28183BCF 36%, #160F2DEB 75%, #B38AE326 100%);
+  border: 1px solid #CEB4F078;
+  box-shadow:
+    inset 0 1px 0 #F7E7FF84,
+    inset 1px 0 0 #E5CFFF25,
+    inset -1px -1px 0 #090616A8,
+    0 13px 36px #0903117D, 0 2px 22px #6F36B42E;
+  backdrop-filter: blur(24px) saturate(170%);
+  -webkit-backdrop-filter: blur(24px) saturate(170%);
+}
+[data-theme="metallic-purple"] .glass-panel::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  z-index: -1;
+  background:
+    radial-gradient(ellipse 95% 58% at 3% -15%, #FFF7FF50 0%, transparent 65%),
+    linear-gradient(115deg, transparent 14%, #D9BBFF1E 31%, transparent 47%, #ECDAFF13 72%, transparent 84%);
+  background-size: 100% 100%, 175% 100%;
+  animation: duet-purple-glass-light 13s ease-in-out infinite alternate;
+}
+[data-theme="metallic-purple"] .bg-card {
+  background: linear-gradient(150deg, #362448F5, #1F1634F5 69%, #312049EE);
+  box-shadow: inset 0 1px 0 #D8BCFF29, 0 7px 22px #0803134D;
+}
+[data-theme="metallic-purple"] header.app-shell {
+  position: relative;
+  background: linear-gradient(105deg, #39284BA8, #1C112DD8 62%, #5B3D788C);
+  border-color: #B994E54A;
+  backdrop-filter: blur(23px) saturate(155%);
+  -webkit-backdrop-filter: blur(23px) saturate(155%);
+  box-shadow: inset 0 1px #F0D9FF42, 0 11px 26px #07041460;
+}
+[data-theme="metallic-purple"] .bg-primary,
+[data-theme="metallic-purple"] button.bg-primary {
+  color: var(--primary-foreground);
+  background: linear-gradient(125deg, #EBDBFF 0%, #AF8BD9 19%, #8968BE 35%, #E1C7FF 52%, #AC8BD9 67%, #DED1F2 87%, #9A75CE 100%);
+  background-size: 200% 100%;
+  border-color: #F5E9FF75;
+  box-shadow: inset 0 1px 0 #FFFFFFA6, inset 0 -1px 0 #472D6BAA,
+    0 6px 17px #814DB55C;
+  transition: background-position .6s ease, box-shadow .25s ease, transform .2s ease;
+}
+[data-theme="metallic-purple"] button.bg-primary:active { transform: scale(.985); }
+[data-theme="metallic-purple"] button.bg-primary:hover {
+  background-position: 100% 50%;
+  box-shadow: inset 0 1px 0 #FFF, 0 7px 20px #A269E177;
+}
+[data-theme="metallic-purple"] .garden-band {
+  background: linear-gradient(105deg, #4C3260D6, #271737EB 58%, #75559FB8);
+  border: 1px solid #D7B5EF63;
+  border-radius: 20px;
+  box-shadow: inset 0 1px #F5DFFF54, 0 12px 25px #12081F65;
+  padding-inline: 1rem;
+}
+
+/* Selector thumbnail renders an actual fluid chrome highlight, not 3 dots. */
+.duet-liquid-purple-preview {
+  position: relative;
+  isolation: isolate;
+  overflow: hidden;
+  border: 1px solid #ECD6FF8C;
+  background:
+    radial-gradient(ellipse at 26% 13%, #FCF5FF 0%, #CDB7F3 14%, #8958C4 35%, transparent 61%),
+    radial-gradient(ellipse at 79% 75%, #DAAFFA 0%, #6935A0 45%, transparent 73%),
+    linear-gradient(127deg, #120B28, #54307D, #171029);
+  box-shadow: inset 0 1px #FFF9, 0 4px 10px #170B284D;
+}
+.duet-liquid-purple-preview::after {
+  content: "";
+  position: absolute;
+  inset: -30%;
+  pointer-events: none;
+  background: conic-gradient(from 20deg, transparent 10%, #FFF6FF93 25%, transparent 34%, #B68EF588 60%, transparent 77%);
+  mix-blend-mode: screen;
+  filter: blur(7px);
+  animation: duet-liquid-purple-shimmer 5s ease-in-out infinite alternate;
+}
+@keyframes duet-liquid-purple-flow {
+  0% { background-position: 0% 15%, 100% 38%, 8% 98%, center; }
+  50% { background-position: 35% 36%, 63% 19%, 30% 75%, center; }
+  100% { background-position: 92% 60%, 7% 58%, 70% 90%, center; }
+}
+@keyframes duet-liquid-purple-shimmer {
+  0% { transform: translate3d(-3%, 2%, 0) rotate(-8deg) scale(1); opacity: .35; }
+  100% { transform: translate3d(5%, -4%, 0) rotate(10deg) scale(1.13); opacity: .65; }
+}
+@keyframes duet-purple-glass-light {
+  0% { background-position: center, 0% 50%; }
+  100% { background-position: center, 100% 50%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="metallic-purple"] body,
+  [data-theme="metallic-purple"] body::before,
+  [data-theme="metallic-purple"] .glass-panel::before,
+  .duet-liquid-purple-preview::after {
+    animation: none !important;
+  }
+  [data-theme="metallic-purple"] body { background-attachment: scroll; }
+}
+@media (prefers-contrast: more) {
+  [data-theme="metallic-purple"] .glass-panel,
+  [data-theme="metallic-purple"] .bg-card {
+    background: #1C122E;
+    border-color: #D6C0EE;
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
