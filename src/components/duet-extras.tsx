@@ -15,6 +15,7 @@ import { playDuetSound } from '@/lib/duet-sounds';
 import { usePartnerOnline } from '@/hooks/use-partner-online';
 import { cachedAvatarUrl } from '@/lib/avatar-images';
 import { formatPartnerLastSeen } from '@/lib/duet-presence';
+import { chatIsNearBottom, scrollChatToBottom } from '@/lib/chat-scroll';
 
 export function Avatar({ profile, name, size = 44, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
@@ -82,7 +83,7 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
     if (!open) return;
     const scrollMessages = () => {
       const list = messagesRef.current;
-      if (list && followBottom.current) list.scrollTop = list.scrollHeight;
+      if (followBottom.current) scrollChatToBottom(list);
     };
     scrollMessages();
     const frame = window.requestAnimationFrame(scrollMessages);
@@ -137,7 +138,7 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
         <div ref={messagesRef} role="log" aria-label="Mensagens do casal" aria-live="polite"
           onScroll={event => {
             const el = event.currentTarget;
-            followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+            followBottom.current = chatIsNearBottom(el);
           }}
           className="duet-chat-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
           {visibleMessages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : 'justify-start'}`}>
