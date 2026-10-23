@@ -1,6 +1,6 @@
 import { supabaseAdmin } from '@/integrations/supabase/client.server';
 import { pushTo, firebasePushConfigured, assertFirebasePushReady } from '@/lib/push.server';
-import { formatPartnerPush, formatQuickReplyPush } from '@/lib/push-copy';
+import { formatPartnerPush, formatQuickReplyPush, formatChatPreviewPush, formatJuntosVotePush } from '@/lib/push-copy';
 import { makeProposalLink } from '@/lib/juntos-suggestions';
 
 export async function drainPartnerPush() {
@@ -34,9 +34,31 @@ export async function drainPartnerPush() {
         }
       }
     }
-    // The database trigger only exposes a generic "chat message" event.
-    // A tightly scoped lookup may reveal the special quick-answer status,
-    // never arbitrary chat text or the user's private messages on the lock screen.
+    if (event.kind === 'proposal_vote') {
+      const match = /^(accepted|declined|agreed):([0-9a-f-]{36})$/i.exec(event.body);
+      if (match) {
+        const { data: proposal, error: proposalError } = await supabaseAdmin.from('couple_proposals')
+          .select('title').eq('id', match[2]!).maybeSingle();
+        if (proposalError) throw proposalError;
+        if (proposal) {
+          notification = formatJuntosVotePush(
+            name, match[1]!.toLowerCase() as 'accepted' | 'declined' | 'agreed', proposal.title,
+          );
+          destination = makeProposalLink(match[2]!);
+        }
+      }
+    }
+    if (event.kind === 'message' && /^message:[0-9a-f-]{36}$/i.test(event.body)) {
+      const id = event.body.slice('message:'.length);
+      // Exact message ID AND actor ID: no guessing across adjacent messages.
+      const { data: chat, error: messageError } = await supabaseAdmin.from('messages')
+        .select('body').eq('id', id).eq('user_id', event.actor_id).maybeSingle();
+      if (messageError) throw messageError;
+      if (chat?.body) notification = formatChatPreviewPush(name, chat.body);
+      destination = '/?duet_view=chat';
+    }
+    // Backwards-compatible handling for queued events from before this release.
+    // New messages are fetched by exact UUID above, not by a time approximation.
     if ((event.kind === 'message' || event.kind === 'addition')
       && event.body === 'enviou uma mensagem no chat'
       && typeof event.created_at === 'string') {
@@ -55,7 +77,7 @@ export async function drainPartnerPush() {
       }
     }
     try {
-      sent += await pushTo([event.recipient_id], notification.title, notification.body, event.id, destination, event.kind === 'online' || event.kind === 'message' ? 'high' : 'normal');
+      sent += await pushTo([event.recipient_id], notification.title, notification.body, event.id, destination, ['online', 'message', 'proposal_vote'].includes(event.kind) ? 'high' : 'normal');
     } catch {
       console.error('Falha ao enviar aviso do casal');
       // Preserve retry eligibility; durable message events have a longer freshness window.
