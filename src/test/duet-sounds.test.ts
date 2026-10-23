@@ -22,7 +22,7 @@ beforeEach(() => {
   vi.resetModules();
   vi.clearAllMocks();
   window.localStorage.clear();
-  vi.stubGlobal('AudioContext', vi.fn(() => audio));
+  vi.stubGlobal('AudioContext', vi.fn(function AudioContextMock() { return audio; }));
 });
 afterEach(() => { vi.unstubAllGlobals(); });
 
