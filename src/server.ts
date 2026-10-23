@@ -9,6 +9,33 @@ type ServerEntry = {
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
 
+let backendConfigurationLogged = false;
+
+function backendHostname(value: string | undefined): string | null {
+  if (!value) return null;
+  try {
+    return new URL(value).hostname;
+  } catch {
+    return null;
+  }
+}
+
+function logBackendConfiguration() {
+  if (backendConfigurationLogged) return;
+  backendConfigurationLogged = true;
+  const browserHost = backendHostname(
+    import.meta.env['VITE_SUPABASE_URL'] || process.env['SUPABASE_URL'],
+  );
+  const serverHost = backendHostname(process.env['SUPABASE_URL']);
+  // Public hostnames only. Never log API keys, credentials, or user data.
+  console.info('[Duet backend configuration]', JSON.stringify({
+    browserHost,
+    serverHost,
+    sameBackend: Boolean(browserHost && serverHost && browserHost === serverHost),
+  }));
+}
+
+
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
     serverEntryPromise = import("@tanstack/react-start/server-entry").then(
@@ -46,6 +73,7 @@ function isH3SwallowedErrorBody(body: string): boolean {
 
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
+    logBackendConfiguration();
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
