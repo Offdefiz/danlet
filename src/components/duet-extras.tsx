@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { Bell, MessageCircle, Send, Heart, House, ListChecks, Camera } from 'lucide-react';
@@ -14,6 +14,7 @@ import { syncPartnerNotifications, sendSelfPushTest } from '@/lib/notifications.
 import { playDuetSound } from '@/lib/duet-sounds';
 import { usePartnerOnline } from '@/hooks/use-partner-online';
 import { cachedAvatarUrl } from '@/lib/avatar-images';
+import { formatPartnerLastSeen } from '@/lib/duet-presence';
 
 export function Avatar({ profile, name, size = 44, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
@@ -49,24 +50,50 @@ export function Avatar({ profile, name, size = 44, onPick }: { profile?: Row<'pr
 
 export function Chat({ userId, partnerId, me, partner, messages, profiles }: { userId: string; partnerId: string | undefined; me: string; partner: string; messages: Row<'messages'>[]; profiles: Row<'profiles'>[] }) {
   const [open, setOpen] = useState(false);
-  useEffect(() => { const show = () => setOpen(true); window.addEventListener('duet:open-chat', show); if (new URLSearchParams(window.location.search).get('duet_view') === 'chat') setOpen(true); return () => window.removeEventListener('duet:open-chat', show); }, []);
-  const { online, checking } = usePartnerOnline(userId, partnerId);
+  const messagesRef = useRef<HTMLDivElement>(null);
+  const followBottom = useRef(true);
+  const openChat = () => { followBottom.current = true; setOpen(true); };
+  useEffect(() => {
+    const show = () => { followBottom.current = true; setOpen(true); };
+    window.addEventListener('duet:open-chat', show);
+    if (new URLSearchParams(window.location.search).get('duet_view') === 'chat') show();
+    return () => window.removeEventListener('duet:open-chat', show);
+  }, []);
+  const { online, checking, lastSeen } = usePartnerOnline(userId, partnerId);
+  const status = online ? 'online agora' : checking && !lastSeen
+    ? 'verificando presença…' : formatPartnerLastSeen(lastSeen);
   const [text, setText] = useState('');
   const [outgoing, setOutgoing] = useState<Array<{ id: string; body: string; user_id: string; created_at: string; status: 'sending' | 'sent' }>>([]);
   const cache = useQueryClient();
   const notify = useServerFn(syncPartnerNotifications);
-  const end = useRef<HTMLDivElement>(null);
   useEffect(() => {
     const deliveredIds = new Set(messages.map(message => message.id));
     setOutgoing(previous => previous.filter(message => !deliveredIds.has(message.id)));
   }, [messages]);
   const visibleMessages = [...messages, ...outgoing.filter(message => !messages.some(saved => saved.id === message.id))]
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  useEffect(() => { if (open) end.current?.scrollIntoView(); }, [open, visibleMessages.length]);
+  const newestMessage = visibleMessages[visibleMessages.length - 1]?.id ?? '';
+
+  // IMPORTANT: scroll only the internal message list, never scrollIntoView().
+  // scrollIntoView used to move the page *behind* the dialog on mobile Safari.
+  // Opening always starts at the latest message; scrolling upward suspends
+  // automatic following until the reader returns to the bottom.
+  useLayoutEffect(() => {
+    if (!open) return;
+    const scrollMessages = () => {
+      const list = messagesRef.current;
+      if (list && followBottom.current) list.scrollTop = list.scrollHeight;
+    };
+    scrollMessages();
+    const frame = window.requestAnimationFrame(scrollMessages);
+    return () => window.cancelAnimationFrame(frame);
+  }, [open, newestMessage, visibleMessages.length]);
+
   async function send(e: React.FormEvent) {
     e.preventDefault();
     const body = text.trim();
     if (!body) return;
+    followBottom.current = true;
     const temporaryId = crypto.randomUUID();
     setText('');
     setOutgoing(current => [...current, { id: temporaryId, body, user_id: userId, created_at: new Date().toISOString(), status: 'sending' }]);
@@ -74,10 +101,8 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
       const { data, error } = await supabase.from('messages').insert({ body, user_id: userId }).select('id,created_at').single();
       if (error || !data) throw error ?? new Error('Mensagem não confirmada.');
       setOutgoing(current => current.map(message => message.id === temporaryId ? { ...message, id: data.id, created_at: data.created_at, status: 'sent' } : message));
-      // Realtime not guaranteed on every network: refresh immediately on acknowledgement.
       playDuetSound('success', userId);
       void cache.invalidateQueries({ queryKey: ['duet', userId] });
-      // Trigger pending push notifications without waiting for the next heartbeat.
       void notify({ data: { heartbeat: false } }).catch(error => console.warn('Avisos pendentes', error));
     } catch {
       setOutgoing(current => current.filter(message => message.id !== temporaryId));
@@ -87,12 +112,54 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
   }
   const partnerProfile = profiles.find(p => p.id !== userId);
   return <>
-    <Button variant="ghost" size="icon" title={`Conversa · ${partner} ${checking ? 'verificando conexão' : online ? 'online agora' : 'offline'}`} aria-label={`Abrir conversa · ${partner} ${checking ? 'verificando conexão' : online ? 'online' : 'offline'}`} onClick={() => setOpen(true)} className="relative"><MessageCircle size={18}/><span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : checking ? 'bg-amber-400' : 'bg-muted-foreground/40'}`}/></Button>
-    <Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[90dvh] flex-col">
-      <DialogHeader><DialogTitle className="flex items-center gap-3"><Avatar profile={partnerProfile} name={partner} size={58}/><span>{partner}<span className={`block text-xs font-normal ${online ? 'text-success' : 'text-muted-foreground'}`}>{online ? 'online agora' : checking ? 'verificando presença…' : 'offline'}</span></span></DialogTitle></DialogHeader>
-      <div className="min-h-48 flex-1 space-y-2 overflow-y-auto py-2">{visibleMessages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : ''}`}><p className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${m.user_id === userId ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{m.body}<span className="mt-1 block text-[10px] opacity-70">{'status' in m && m.status === 'sending' ? 'Enviando… · ' : ''}{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></p></div>)}{!visibleMessages.length && <p className="text-center text-sm text-muted-foreground">Mande um oi para {partner}, {me}. ♡</p>}<div ref={end}/></div>
-      <form onSubmit={send} className="flex gap-2"><Input value={text} onChange={e => setText(e.target.value)} placeholder="Escreva uma mensagem…" maxLength={2000}/><Button size="icon" aria-label="Enviar"><Send/></Button></form>
-    </DialogContent></Dialog>
+    <Button variant="ghost" size="icon" title={`Conversa · ${partner} ${status}`}
+      aria-label={`Abrir conversa · ${partner} ${status}`}
+      onClick={openChat} className="relative shrink-0 rounded-full">
+      <MessageCircle size={20}/>
+      <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : checking ? 'bg-amber-400' : 'bg-muted-foreground/40'}`}/>
+    </Button>
+    <Dialog open={open} onOpenChange={next => { if (next) followBottom.current = true; setOpen(next); }}>
+      <DialogContent aria-label="Conversa do casal"
+        className="duet-chat-dialog flex h-[min(88dvh,790px)] max-h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-xl min-h-0 flex-col gap-0 overflow-hidden rounded-[28px] border-border bg-background p-0 shadow-2xl sm:h-[min(82dvh,790px)] sm:rounded-[30px]">
+        <DialogHeader className="shrink-0 border-b border-border bg-card/90 px-4 py-4 pr-16 text-left sm:px-6 sm:pr-16">
+          <DialogTitle className="flex min-w-0 items-center gap-3">
+            <Avatar profile={partnerProfile} name={partner} size={54}/>
+            <span className="min-w-0 flex-1">
+              <span className="block truncate text-base font-semibold">{partner}</span>
+              <span title="Horário da última atividade registrada; pode haver atraso de até um minuto."
+                className={`mt-1 block text-xs font-medium leading-snug ${online ? 'text-success' : 'text-muted-foreground'}`}>
+                {online && <span aria-hidden="true" className="mr-1 inline-block h-2 w-2 rounded-full bg-success"/>}
+                {status}
+              </span>
+            </span>
+          </DialogTitle>
+        </DialogHeader>
+        <div ref={messagesRef} role="log" aria-label="Mensagens do casal" aria-live="polite"
+          onScroll={event => {
+            const el = event.currentTarget;
+            followBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 100;
+          }}
+          className="duet-chat-scroll min-h-0 flex-1 space-y-3 overflow-y-auto overscroll-contain px-3 py-4 sm:px-5">
+          {visibleMessages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : 'justify-start'}`}>
+            <p className={`max-w-[86%] break-words whitespace-pre-wrap rounded-[22px] px-4 py-3 text-sm leading-relaxed shadow-sm sm:max-w-[76%] ${m.user_id === userId ? 'rounded-br-md bg-primary text-primary-foreground' : 'rounded-bl-md border border-border bg-secondary text-secondary-foreground'}`}>
+              {m.body}
+              <span className="mt-2 block text-right text-[11px] opacity-75">
+                {'status' in m && m.status === 'sending' ? 'Enviando… · ' : ''}
+                {new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              </span>
+            </p>
+          </div>)}
+          {!visibleMessages.length && <p className="pt-10 text-center text-sm text-muted-foreground">Mande um oi para {partner}, {me}. ♡</p>}
+        </div>
+        <form onSubmit={send} className="duet-chat-composer flex shrink-0 items-end gap-2 border-t border-border bg-card/95 px-3 pb-[max(14px,env(safe-area-inset-bottom))] pt-3 sm:px-5">
+          <Input value={text} onChange={e => setText(e.target.value)} aria-label="Escrever mensagem"
+            placeholder="Escreva uma mensagem…" maxLength={2000}
+            className="h-12 min-w-0 flex-1 rounded-2xl bg-background px-4"/>
+          <Button type="submit" size="icon" disabled={!text.trim()}
+            aria-label="Enviar mensagem" className="h-12 w-12 shrink-0 rounded-full"><Send size={20}/></Button>
+        </form>
+      </DialogContent>
+    </Dialog>
   </>;
 }
 
