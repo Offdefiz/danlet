@@ -32,7 +32,7 @@ export async function assertFirebasePushReady(): Promise<void> {
   await firebaseAccessToken(config);
 }
 
-export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string, destination?: string) {
+export async function pushTo(userIds: string[] | null, title: string, body: string, tag?: string, destination?: string, priority: 'normal' | 'high' = 'normal') {
   const creds = firebaseCredentials();
   if (!firebasePushConfigured() || !creds) throw new Error('Notificações push pendentes: configure a conta de serviço Firebase no Render.');
   const access = await firebaseAccessToken(creds);
@@ -57,11 +57,12 @@ export async function pushTo(userIds: string[] | null, title: string, body: stri
             token,
             notification: { title, body },
             webpush: {
+              headers: { Urgency: priority, TTL: priority === 'high' ? '86400' : '3600' },
               fcm_options: { link: safeDestination(destination) },
               notification: {
                 title, body, icon: APP_ICON, badge: APP_BADGE, lang: 'pt-BR',
                 silent: false, vibrate: [130, 70, 130],
-                ...(tag ? { tag, renotify: !tag.startsWith('online-') } : {}),
+                ...(tag ? { tag, renotify: true } : {}),
               },
             },
           },

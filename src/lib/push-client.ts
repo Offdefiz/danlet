@@ -1,5 +1,5 @@
 import { initializeApp, getApps } from 'firebase/app';
-import { getMessaging, getToken, isSupported } from 'firebase/messaging';
+import { getMessaging, getToken, isSupported, onMessage } from 'firebase/messaging';
 import { supabase } from '@/integrations/supabase/client';
 
 // Prefer credentials belonging to the Duet owners; legacy public settings are
@@ -79,4 +79,29 @@ export async function enablePush(userId: string): Promise<PushStatus> {
   const { error } = await supabase.from('push_tokens').upsert({ token, user_id: userId });
   if (error) throw new Error('Não foi possível salvar este aparelho para receber avisos.');
   return 'registered';
+}
+
+
+/** Firebase does not automatically display a banner for an active foreground
+ * page. The subscriber renders an in-app alert and asks the registered worker
+ * to display an OS notification when permission and platform support allow.
+ */
+export type ForegroundPush = { title: string; body: string; url: string };
+export async function subscribeForegroundPush(onNotice: (notice: ForegroundPush) => void): Promise<(() => void) | null> {
+  if (typeof window === 'undefined' || !config.apiKey || !config.projectId || !config.appId || !config.messagingSenderId) return null;
+  if (!('Notification' in window) || Notification.permission !== 'granted' || !('serviceWorker' in navigator)) return null;
+  if (!(await isSupported())) return null;
+  const app = getApps().find(a => a.name === 'duet-push') ?? initializeApp(config, 'duet-push');
+  return onMessage(getMessaging(app), payload => {
+    const title = String(payload.notification?.title || 'Duet ♡').slice(0, 120);
+    const body = String(payload.notification?.body || '').slice(0, 300);
+    if (!body) return;
+    const link = payload.fcmOptions?.link || '/';
+    let url = '/';
+    try {
+      const target = new URL(link, window.location.origin);
+      if (target.origin === window.location.origin) url = target.pathname + target.search;
+    } catch { /* default to Duet home */ }
+    onNotice({ title, body, url });
+  });
 }

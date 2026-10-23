@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { dailyProposalSuggestion, juntosIdeas, makeProposalLink, parseProposalLink, proactiveProposalHours } from '@/lib/juntos-suggestions';
+import { dailyProposalSuggestion, juntosIdeas, makeProposalLink, parseProposalLink, proactiveProposalHours, proposalSection } from '@/lib/juntos-suggestions';
 import { currentReminderSlot } from '@/lib/push-copy';
 
 describe('Juntos: shared proposals, daily options and notification limits', () => {
@@ -17,6 +17,14 @@ describe('Juntos: shared proposals, daily options and notification limits', () =
     expect(picks.every(p => p && Number(p.time.slice(0,2)) >= 9 && Number(p.time.slice(0,2)) <= 21)).toBe(true);
     expect(dailyProposalSuggestion('2026-10-23', 21)).toBeNull();
     expect(currentReminderSlot(new Date('2026-10-24T01:00:00Z'))?.id).toBe('t22-00');
+  });
+  it('moves rejected or expired ideas into history, keeping live Juntos clean', () => {
+    const today = '2026-10-23';
+    expect(proposalSection({ status: 'pending', date: today }, today)).toBe('pending');
+    expect(proposalSection({ status: 'pending', date: '2026-10-24' }, today)).toBe('pending');
+    expect(proposalSection({ status: 'declined', date: today }, today)).toBe('history');
+    expect(proposalSection({ status: 'pending', date: '2026-10-22' }, today)).toBe('history');
+    expect(proposalSection({ status: 'agreed', date: '2026-10-22' }, today)).toBe('agreed');
   });
   it('builds private in-app deep links only for valid UUIDs', () => {
     const id = '15ad632e-46e4-46e6-a1f0-886be02a6f31';

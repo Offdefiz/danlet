@@ -10,7 +10,6 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/u
 import { supabase } from '@/integrations/supabase/client';
 import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
-import { onlineCooldowns } from '@/lib/notification-rules';
 import { syncPartnerNotifications, sendSelfPushTest } from '@/lib/notifications.functions';
 import { playDuetSound } from '@/lib/duet-sounds';
 
@@ -136,12 +135,12 @@ export function PushButton({ userId, hideTrigger = false }: { userId: string; hi
     <Dialog open={open} onOpenChange={setOpen}><DialogContent><DialogHeader><DialogTitle>Nossos avisos ♡</DialogTitle></DialogHeader>
       <div className="rounded-xl border border-border bg-secondary/50 p-3 text-sm">
         <p className="font-medium">Um carinho para lembrar de nós 💗</p>
-        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Além das mensagens e das novidades, o Duet pode lembrar vocês de conversar e sonhar juntos até 3 vezes ao dia, entre 9h e 21h (horário de Brasília), quando a rotina de lembretes estiver ativada no servidor.</p>
+        <p className="mt-1 text-xs leading-relaxed text-muted-foreground">Mensagens e novas entradas online têm prioridade e não dependem dos lembretes automáticos. Os carinhos e sugestões automáticos são verificados aproximadamente a cada 20 minutos, inclusive de madrugada. O iOS pode agrupar ou silenciar avisos conforme as configurações do aparelho.</p>
         <p className="mt-1 text-xs text-muted-foreground">Para não receber avisos, desligue «Receber notificações push». No iPhone, abra o Duet pelo ícone adicionado à Tela de Início para ativar os avisos.</p>
       </div>
       {!loaded ? <p role="status" className="text-sm text-muted-foreground">Abrindo preferências…</p> : <div className="space-y-5">
-        {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Novas adições do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
-        <label className="block text-sm">Intervalo entre avisos de presença<select aria-label="Intervalo entre avisos de presença" value={preferences.online_cooldown_minutes} disabled={busy || !preferences.enabled || !preferences.online} onChange={e => setPreferences(p => ({ ...p, online_cooldown_minutes: Number(e.target.value) }))} className="mt-2 h-10 w-full rounded-md border border-input bg-card px-3">{onlineCooldowns.map(value => <option key={value} value={value}>{value} minutos</option>)}</select></label>
+        {([{ key: 'enabled', label: 'Receber notificações push' }, { key: 'additions', label: 'Outras novidades do parceiro' }, { key: 'online', label: 'Quando o parceiro ficar online' }] as const).map(item => <label key={item.key} className="flex items-center justify-between gap-4 text-sm"><span>{item.label}</span><Switch aria-label={item.label} checked={preferences[item.key]} disabled={busy || (item.key !== 'enabled' && !preferences.enabled)} onCheckedChange={value => setPreferences(p => ({ ...p, [item.key]: value }))}/></label>)}
+        <p className="text-xs text-muted-foreground">Mensagens do chat continuam prioritárias quando os avisos push estiverem ligados. A opção de novidades não bloqueia mensagens.</p>
         <div className="flex flex-wrap justify-between gap-3"><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => { setBusy(true); try { const status = await enablePush(userId); if (status === 'registered') toast.success(pushMsg[status]); else toast.error(pushMsg[status]); } catch { toast.error('Não foi possível ativar este aparelho.'); } finally { setBusy(false); } }}><Bell size={16}/>Ativar neste aparelho</Button><Button variant="outline" disabled={busy || !preferences.enabled} onClick={async () => {
           setBusy(true);
           try {

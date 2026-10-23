@@ -13,7 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
-import { playDuetSound } from "@/lib/duet-sounds";
+import { playDuetSound, activeSoundUser } from "@/lib/duet-sounds";
 
 function NotFoundComponent() {
   return (
@@ -128,7 +128,7 @@ function GlobalInteractionSounds() {
       const control = target.closest('button, a[href], [role="button"], [role="switch"], [role="tab"], [role="checkbox"], input[type="submit"], input[type="button"], select, summary');
       if (!(control instanceof HTMLElement) || control.matches(':disabled, [aria-disabled="true"]')) return;
       if (control.closest('[data-duet-sound="off"]')) return;
-      const id = (() => { try { return localStorage.getItem('duet:active-user-id') || 'global'; } catch { return 'global'; } })();
+      const id = activeSoundUser();
       const label = (control.getAttribute('aria-label') || control.textContent || '').trim().toLowerCase();
       const kind = control.matches('a[href], [role="tab"]') ? 'navigate'
         : control.matches('[role="switch"], [role="checkbox"], select') ? 'toggle'
@@ -136,8 +136,22 @@ function GlobalInteractionSounds() {
         : 'tap';
       playDuetSound(kind, id);
     };
+    // Pointer events unlock mobile Safari audio before React click handlers run.
+    // Keyboard-only users receive the same sound on Space/Enter.
+    const onKey = (event: KeyboardEvent) => {
+      if (!event.isTrusted || event.repeat || !['Enter', ' '].includes(event.key)) return;
+      const target = event.target;
+      if (!(target instanceof Element) || target.matches('input, textarea, [contenteditable="true"]')) return;
+      const control = target.closest('button, a[href], [role="button"], [role="switch"], [role="tab"], [role="checkbox"], summary');
+      if (!(control instanceof HTMLElement) || control.matches(':disabled, [aria-disabled="true"]') || control.closest('[data-duet-sound="off"]')) return;
+      playDuetSound(control.matches('a[href], [role="tab"]') ? 'navigate' : 'tap', activeSoundUser());
+    };
     document.addEventListener('pointerdown', onPointer, { capture: true, passive: true });
-    return () => document.removeEventListener('pointerdown', onPointer, true);
+    document.addEventListener('keydown', onKey, true);
+    return () => {
+      document.removeEventListener('pointerdown', onPointer, true);
+      document.removeEventListener('keydown', onKey, true);
+    };
   }, []);
   return null;
 }
