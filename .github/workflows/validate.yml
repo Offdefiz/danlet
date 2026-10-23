@@ -22,6 +22,19 @@ jobs:
       - uses: oven-sh/setup-bun@v2
       - name: Install locked dependencies
         run: bun install --frozen-lockfile
+      - name: Require changelog entry for product changes
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_BRANCH: ${{ github.base_ref }}
+        run: |
+          git fetch origin "$BASE_BRANCH" --depth=1
+          changed=$(git diff --name-only "origin/$BASE_BRANCH" HEAD)
+          if echo "$changed" | grep -Eq '^(src/|public/)'; then
+            if ! echo "$changed" | grep -qx 'src/lib/release-notes.ts'; then
+              echo 'Every visible product change requires a note in src/lib/release-notes.ts'
+              exit 1
+            fi
+          fi
       - name: Run automated tests
         run: bun run test
       - name: Static analysis
