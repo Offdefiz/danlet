@@ -2,7 +2,7 @@ import { createServerFn } from '@tanstack/react-start';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { z } from 'zod';
 import { brazilianToday } from '@/lib/duet-calendar';
-import { makeProposalLink } from '@/lib/juntos-suggestions';
+import { makeProposalLink, canRemindPartner } from '@/lib/juntos-suggestions';
 
 // A short technical debounce against accidental double taps. No daily cap.
 const previousResend = new Map<string, number>();
@@ -26,14 +26,14 @@ export const resendJuntosProposal = createServerFn({ method: 'POST' })
       .from('couple_proposals').select('id, title, status, date')
       .eq('id', data.proposalId).maybeSingle();
     if (proposalError) throw proposalError;
-    if (!proposal || proposal.status !== 'pending' || proposal.date < brazilianToday()) {
+    if (!proposal || !canRemindPartner(proposal, false, brazilianToday())) {
       throw new Error('Esta proposta já foi encerrada ou saiu da lista de pendências.');
     }
     const { data: answer, error: answerError } = await supabaseAdmin
       .from('couple_proposal_votes').select('user_id')
       .eq('proposal_id', proposal.id).eq('user_id', partner.user_id).maybeSingle();
     if (answerError) throw answerError;
-    if (answer) throw new Error('Seu par já respondeu a essa proposta.');
+    if (!canRemindPartner(proposal, Boolean(answer), brazilianToday())) throw new Error('Seu par já respondeu a essa proposta.');
 
     const key = context.userId + ':' + proposal.id;
     const now = Date.now();
