@@ -23,27 +23,35 @@ function ResetPassword() {
   const navigate = useNavigate();
 
   useEffect(() => {
-    // Supabase can redirect with either an implicit-flow hash or a PKCE ?code.
-    // Wait for a verified auth session before showing the password form.
-    const hash = new URLSearchParams(window.location.hash.slice(1));
-    const query = new URLSearchParams(window.location.search);
-    const recoveryLink = ['recovery', 'invite'].includes(hash.get('type') ?? query.get('type') ?? '') || query.has('code');
     let mounted = true;
-
+    // Supabase may consume the recovery URL fragment before React mounts,
+    // so checking for a "type=recovery" parameter here is not reliable.
+    // Only a verified session authorizes updateUser; URL tokens alone do not.
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       if (!mounted) return;
-      if (event === 'PASSWORD_RECOVERY' || recoveryLink) {
+      if (event === 'SIGNED_OUT') {
+        setCanReset(false);
+        setChecking(false);
+      } else if (event === 'PASSWORD_RECOVERY' || event === 'SIGNED_IN' || event === 'INITIAL_SESSION') {
         setCanReset(Boolean(session));
+        // INITIAL_SESSION can be null while redirect authentication is
+        // being processed; let the getSession promise settle first.
+        if (session) setChecking(false);
       }
-      setChecking(false);
     });
+
     void supabase.auth.getSession()
-      .then(({ data }) => {
+      .then(({ data, error }) => {
         if (!mounted) return;
-        if (data.session && recoveryLink) setCanReset(true);
+        setCanReset(!error && Boolean(data.session));
         setChecking(false);
       })
-      .catch(() => { if (mounted) setChecking(false); });
+      .catch(() => {
+        if (mounted) {
+          setCanReset(false);
+          setChecking(false);
+        }
+      });
 
     return () => { mounted = false; subscription.unsubscribe(); };
   }, []);
@@ -71,7 +79,7 @@ function ResetPassword() {
           <Input type="password" required minLength={8} maxLength={200} value={password} onChange={e => setPassword(e.target.value)} autoComplete="new-password" className="mt-2"/>
         </label>
         <Button disabled={busy} className="w-full">{busy ? 'Salvando…' : 'Salvar senha'}</Button>
-      </form> : <p className="text-sm text-muted-foreground">Link expirado ou inválido. Solicite outro link pela área de configurações do Duet.</p>}
+      </form> : <p className="text-sm text-muted-foreground">Não foi possível validar sua sessão de recuperação. Solicite um novo link e abra-o no mesmo navegador.</p>}
     {message && <p role="status">{message}</p>}
     <Button variant="link" onClick={() => navigate({ to: '/' })}>Voltar ao Duet</Button>
   </main>;
