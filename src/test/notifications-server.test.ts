@@ -73,6 +73,48 @@ describe('Partner queue delivery', () => {
     expect(boundary.pushTo).not.toHaveBeenCalled();
   });
 
+  it('delivers real chat text by its exact message ID to the other account', async () => {
+    const chat = {
+      id: '6ad452dc-cde0-42a7-9dd8-6629efb925f1',
+      body: 'Vamos jantar? 🍝',
+    };
+    boundary.rpc.mockResolvedValue({ data: [{ ...event, kind: 'message', body: 'message:' + chat.id }], error: null });
+    const select = { maybeSingle: async () => ({ data: { body: chat.body }, error: null }) };
+    const byId = { eq: vi.fn(() => select) };
+    const first = { eq: vi.fn(() => byId) };
+    boundary.from.mockImplementation((table: string) => {
+      if (table === 'couple_members') return { select: members };
+      if (table === 'messages') return { select: () => first };
+      if (table === 'notification_preferences') return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+      throw new Error('Unexpected synthetic table: ' + table);
+    });
+    expect(await drainPartnerPush()).toBe(1);
+    expect(first.eq).toHaveBeenCalledWith('id', chat.id);
+    expect(byId.eq).toHaveBeenCalledWith('user_id', 'actor-test');
+    expect(boundary.pushTo).toHaveBeenCalledWith(
+      ['recipient-test'], expect.stringMatching(/Daniel.*mensagem/), chat.body,
+      'event-test', '/?duet_view=chat', 'high',
+    );
+  });
+  it('notifies the partner explicitly when a suggestion is accepted', async () => {
+    const id = 'f91a8266-497a-430d-9c76-c46be1ff79bf';
+    boundary.rpc.mockResolvedValue({ data: [{ ...event, kind: 'proposal_vote', body: 'accepted:' + id }], error: null });
+    const byId = { maybeSingle: async () => ({ data: { title: 'Guacamole hoje?' }, error: null }) };
+    const lookup = { eq: () => byId };
+    boundary.from.mockImplementation((table: string) => {
+      if (table === 'couple_members') return { select: members };
+      if (table === 'couple_proposals') return { select: () => lookup };
+      if (table === 'notification_preferences') return { select: () => ({ eq: async () => ({ data: [], error: null }) }) };
+      throw new Error('Unexpected synthetic table');
+    });
+    expect(await drainPartnerPush()).toBe(1);
+    expect(boundary.pushTo).toHaveBeenCalledWith(
+      ['recipient-test'], expect.stringMatching(/topou/),
+      expect.stringMatching(/Guacamole hoje/), 'event-test',
+      expect.stringContaining('duet_proposal='), 'high',
+    );
+  });
+
   it('releases a failed delivery claim without logging its raw error', async () => {
     boundary.pushTo.mockRejectedValue(new Error('sensitive-test-marker'));
     expect(await drainPartnerPush()).toBe(0);
