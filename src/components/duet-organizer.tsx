@@ -213,7 +213,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <ThemePicker userId={userId} hideTrigger/>
         <PushButton userId={userId} hideTrigger/>
         <DuetNotificationCenter userId={userId} activity={data.activity} messages={data.messages} members={data.members} onNavigate={target => { if (target === 'chat') window.dispatchEvent(new Event('duet:open-chat')); else setTab(target); }}/>
-        <Chat userId={userId} me={me?.person ?? ''} partner={partnerName} messages={data.messages} profiles={data.profiles}/>
+        <Chat userId={userId} partnerId={partner?.user_id} me={me?.person ?? ''} partner={partnerName} messages={data.messages} profiles={data.profiles}/>
         <DuetAccountMenu name={me?.person ?? 'Nós'} profile={data.profiles.find(p => p.id === userId)} onProfile={() => setTab('profile')} onSignOut={() => void signOut()} online={online} sync={sync}/>
       </div>
     </header>{!online && <div role="status" className="app-shell mt-3 rounded-xl border border-warning/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">Você está sem internet. Suas alterações serão salvas quando a conexão voltar; confira antes de fechar o aplicativo.</div>}<main className="app-shell py-7 sm:py-10">

@@ -26,9 +26,10 @@ afterEach(() => {
 });
 
 describe('Personal themes stored on each device', () => {
-  it('preserves all nine palettes and adds pink glitter', () => {
-    expect(themes).toHaveLength(10);
+  it('preserves the original palettes and adds glitter and purple chrome', () => {
+    expect(themes).toHaveLength(11);
     expect(themes.find(t => t.id === 'pink-glitter')?.label).toMatch(/Glitter/);
+    expect(themes.find(t => t.id === 'metallic-purple')?.label).toBe('Metallic Purple');
   });
 
   it('saves a palette in localStorage and restores it when reopened', async () => {
@@ -49,6 +50,20 @@ describe('Personal themes stored on each device', () => {
     cleanup();
     render(<ThemePicker userId={daniel} />);
     await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('dark-elegant'));
+  });
+
+  it('applies Metallic Purple individually without changing the partner palette', async () => {
+    window.localStorage.setItem(`duet:personal-theme:${leticia}`, 'pink-glitter');
+    render(<ThemePicker userId={daniel} />);
+    fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
+    const metallic = screen.getByRole('button', { name: /Metallic Purple/i });
+    fireEvent.click(metallic);
+    expect(document.documentElement.dataset['theme']).toBe('romance');
+    expect(metallic.querySelector('.duet-liquid-purple-preview')).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Aplicar tema' }));
+    await waitFor(() => expect(document.documentElement.dataset['theme']).toBe('metallic-purple'));
+    expect(window.localStorage.getItem(`duet:personal-theme:${daniel}`)).toBe('metallic-purple');
+    expect(window.localStorage.getItem(`duet:personal-theme:${leticia}`)).toBe('pink-glitter');
   });
 
   it('discards an unconfirmed palette when the picker is closed', async () => {
