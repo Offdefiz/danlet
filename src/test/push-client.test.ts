@@ -5,6 +5,7 @@ const fcm = vi.hoisted(() => ({
   getApps: vi.fn(() => []),
   getMessaging: vi.fn(() => ({})),
   getToken: vi.fn(async () => 'test-device-token'),
+  onMessage: vi.fn(() => vi.fn()),
   isSupported: vi.fn(async () => true),
   upsert: vi.fn(async () => ({ error: null })),
 }));
@@ -101,6 +102,18 @@ describe('FCM device registration', () => {
     expect(register).not.toHaveBeenCalled();
   });
 
+  it('subscribes to foreground Firebase pushes without prompting again', async () => {
+    vi.stubGlobal('Notification', { permission: 'granted', requestPermission });
+    const listener = vi.fn();
+    const { subscribeForegroundPush } = await import('@/lib/push-client');
+    const unsubscribe = await subscribeForegroundPush(listener);
+    expect(fcm.onMessage).toHaveBeenCalledOnce();
+    const onReceive = fcm.onMessage.mock.calls[0]![1] as (payload: unknown) => void;
+    onReceive({ notification: { title: 'Duet ♡', body: 'Letícia enviou uma mensagem' },
+      fcmOptions: { link: 'https://outside.test/evil' } });
+    expect(listener).toHaveBeenCalledWith({ title: 'Duet ♡', body: 'Letícia enviou uma mensagem', url: '/' });
+    expect(typeof unsubscribe).toBe('function');
+  });
   it('rejects an invalid VAPID key before prompting', async () => {
     vi.stubEnv('VITE_FIREBASE_VAPID_KEY', 'invalid');
     const { enablePush } = await import('@/lib/push-client');
