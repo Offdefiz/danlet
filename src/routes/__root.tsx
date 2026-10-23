@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { Toaster } from "@/components/ui/sonner";
+import { playDuetSound } from "@/lib/duet-sounds";
 
 function NotFoundComponent() {
   return (
@@ -118,12 +119,36 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+function GlobalInteractionSounds() {
+  useEffect(() => {
+    const onPointer = (event: PointerEvent) => {
+      if (!event.isTrusted) return;
+      const target = event.target;
+      if (!(target instanceof Element)) return;
+      const control = target.closest('button, a[href], [role="button"], [role="switch"], [role="tab"], [role="checkbox"], input[type="submit"], input[type="button"], select, summary');
+      if (!(control instanceof HTMLElement) || control.matches(':disabled, [aria-disabled="true"]')) return;
+      if (control.closest('[data-duet-sound="off"]')) return;
+      const id = (() => { try { return localStorage.getItem('duet:active-user-id') || 'global'; } catch { return 'global'; } })();
+      const label = (control.getAttribute('aria-label') || control.textContent || '').trim().toLowerCase();
+      const kind = control.matches('a[href], [role="tab"]') ? 'navigate'
+        : control.matches('[role="switch"], [role="checkbox"], select') ? 'toggle'
+        : /fechar|cancelar|voltar|close|dismiss/.test(label) ? 'cancel'
+        : 'tap';
+      playDuetSound(kind, id);
+    };
+    document.addEventListener('pointerdown', onPointer, { capture: true, passive: true });
+    return () => document.removeEventListener('pointerdown', onPointer, true);
+  }, []);
+  return null;
+}
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
       {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+      <GlobalInteractionSounds />
       <Outlet />
       <Toaster richColors position="top-center" />
     </QueryClientProvider>
