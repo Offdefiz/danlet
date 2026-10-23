@@ -23,6 +23,8 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
   const [email, setEmail] = useState('');
   const [originalEmail, setOriginalEmail] = useState('');
   const [busy, setBusy] = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [confirmPassword, setConfirmPassword] = useState('');
 
   useEffect(() => {
     if (!accountOpen) return;
@@ -48,6 +50,29 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
       setAccountOpen(false);
     } catch { toast.error('Não foi possível solicitar a alteração de e-mail.'); }
     finally { setBusy(false); }
+  }
+  async function setPassword(e: React.FormEvent) {
+    e.preventDefault();
+    if (busy) return;
+    if (newPassword.length < 8 || newPassword !== confirmPassword) {
+      toast.error('A senha precisa ter pelo menos 8 caracteres e coincidir com a confirmação.');
+      return;
+    }
+    setBusy(true);
+    try {
+      // Only the current authenticated Supabase user can change their own password.
+      // No admin key, temporary shared password, or server-side bypass is needed.
+      const { data: { user }, error: userError } = await supabase.auth.getUser();
+      if (userError || !user) throw new Error('Sua sessão expirou. Entre novamente para definir uma senha.');
+      const { error } = await supabase.auth.updateUser({ password: newPassword });
+      if (error) throw error;
+      toast.success('Senha definida! Você já pode entrar com e-mail e senha.');
+      setNewPassword('');
+      setConfirmPassword('');
+      setAccountOpen(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não foi possível definir a senha.');
+    } finally { setBusy(false); }
   }
   async function resetPassword() {
     if (!originalEmail) { toast.error('Seu e-mail não está disponível.'); return; }
@@ -86,6 +111,17 @@ export function DuetAccountMenu({ name, profile, onProfile, onSignOut, online, s
         <form onSubmit={updateEmail} className="space-y-3">
           <label className="block text-sm">E-mail<Input type="email" required maxLength={254} autoComplete="email" value={email} onChange={e => setEmail(e.target.value)} className="mt-2"/></label>
           <Button disabled={busy || !email.trim() || email.trim() === originalEmail} className="w-full">Solicitar alteração de e-mail</Button>
+        </form>
+        <form onSubmit={setPassword} className="space-y-3 border-t pt-4">
+          <p className="text-sm font-medium">Definir ou alterar senha sem e-mail</p>
+          <p className="text-xs text-muted-foreground">Disponível somente com sua conta já conectada. A senha fica protegida pelo Supabase, não é salva no Duet.</p>
+          <label className="block text-sm">Nova senha
+            <Input className="mt-2" type="password" minLength={8} maxLength={200} autoComplete="new-password" required value={newPassword} onChange={e => setNewPassword(e.target.value)}/>
+          </label>
+          <label className="block text-sm">Confirmar nova senha
+            <Input className="mt-2" type="password" minLength={8} maxLength={200} autoComplete="new-password" required value={confirmPassword} onChange={e => setConfirmPassword(e.target.value)}/>
+          </label>
+          <Button type="submit" className="w-full" disabled={busy || newPassword.length < 8 || newPassword !== confirmPassword}>{busy ? 'Salvando…' : 'Salvar minha senha'}</Button>
         </form>
         <Button variant="outline" disabled={busy || !originalEmail} onClick={resetPassword}>Receber link para alterar senha</Button>
         <p className="text-xs text-muted-foreground">Por segurança, mudanças de e-mail podem exigir confirmação nas caixas de entrada.</p>
