@@ -37,7 +37,7 @@ export async function drainPartnerPush() {
     // The database trigger only exposes a generic "chat message" event.
     // A tightly scoped lookup may reveal the special quick-answer status,
     // never arbitrary chat text or the user's private messages on the lock screen.
-    if (event.kind === 'addition'
+    if ((event.kind === 'message' || event.kind === 'addition')
       && event.body === 'enviou uma mensagem no chat'
       && typeof event.created_at === 'string') {
       const at = Date.parse(event.created_at);
@@ -55,10 +55,10 @@ export async function drainPartnerPush() {
       }
     }
     try {
-      sent += await pushTo([event.recipient_id], notification.title, notification.body, event.kind === 'online' ? `online-${event.actor_id}` : event.id, destination);
+      sent += await pushTo([event.recipient_id], notification.title, notification.body, event.id, destination, event.kind === 'online' || event.kind === 'message' ? 'high' : 'normal');
     } catch {
       console.error('Falha ao enviar aviso do casal');
-      // Retries remain subject to the SQL freshness and presence cooldown rules.
+      // Preserve retry eligibility; durable message events have a longer freshness window.
       const { error: releaseError } = await supabaseAdmin.from('push_event_queue').update({ processed_at: null }).eq('id', event.id);
       if (releaseError) releaseFailed = true;
     }
