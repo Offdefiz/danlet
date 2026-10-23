@@ -59,3 +59,12 @@ export function proposalSection(
   if (proposal.status === 'declined' || proposal.date < today) return 'history';
   return 'pending';
 }
+
+/** Resending an alert never changes the votes or resurrects old proposals. */
+export function canRemindPartner(
+  proposal: { status: string; date: string },
+  partnerHasVoted: boolean,
+  today: string,
+): boolean {
+  return proposal.status === 'pending' && proposal.date >= today && !partnerHasVoted;
+}
