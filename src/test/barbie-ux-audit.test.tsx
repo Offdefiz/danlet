@@ -16,6 +16,19 @@ describe('Barbie glitter and accessibility', () => {
   });
 });
 
+describe('Metallic Purple motion and contrast', () => {
+  it('uses flowing metallic reflections with no click-intercepting layers', () => {
+    const css = readFileSync('src/styles.css', 'utf8');
+    expect(css).toContain('[data-theme="metallic-purple"]');
+    expect(css).toContain('duet-liquid-purple-flow');
+    expect(css).toContain('duet-liquid-purple-shimmer');
+    expect(css).toContain('duet-liquid-purple-preview');
+    expect(css).toContain('pointer-events: none');
+    expect(css).toContain('prefers-reduced-motion: reduce');
+    expect(css).toContain('prefers-contrast: more');
+  });
+});
+
 describe('Couple today and export time', () => {
   it('uses Brazilian local date across the UTC calendar boundary', () => {
     expect(brazilianToday(new Date('2026-10-22T01:30:00.000Z'))).toBe('2026-10-21');
