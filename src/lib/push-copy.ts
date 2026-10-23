@@ -68,17 +68,15 @@ export const sweetReminders = [
   'A fofoca do dia: um simples oi continua sendo uma ótima ideia. 👀',
 ] as const;
 
-// GitHub checks about every twenty minutes; the database idempotency marker
-// permits no more than one proactive push per window, never after 22:00.
-export const reminderSlots = [
-  { id: 'cafe', startHour: 9, endHour: 11 },
-  { id: 'almoco', startHour: 12, endHour: 14 },
-  { id: 'tarde', startHour: 15, endHour: 17 },
-  { id: 'fim-dia', startHour: 18, endHour: 20 },
-  { id: 'noite', startHour: 21, endHour: 22 },
-] as const;
+// Scheduler checks every twenty minutes; one proactive push per São Paulo local-hour
+// slot (09:00–20:59), at most twelve per subscribed recipient per day.
+export const reminderSlots = Array.from({ length: 12 }, (_, index) => ({
+  id: 'h' + String(index + 9).padStart(2, '0'),
+  startHour: index + 9,
+  endHour: index + 10,
+}));
 
-/** Up to five opt-out reminders/day, never overnight (America/Sao_Paulo). */
+/** Up to twelve opt-out reminders/day; never overnight (America/Sao_Paulo). */
 export function currentReminderSlot(now: Date) {
   const parts = new Intl.DateTimeFormat('en-US', {
     timeZone: 'America/Sao_Paulo',
