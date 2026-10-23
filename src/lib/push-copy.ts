@@ -20,7 +20,7 @@ export function formatPartnerPush(person: string, kind: string, eventBody: strin
  * iOS itself decides whether previews are visible while the phone is locked.
  */
 export function formatChatPreviewPush(person: string, message: string): PushCopy {
-  const excerpt = message.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim();
+  const excerpt = Array.from(message, char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127 ? ' ' : char).join('').replace(/\s+/g, ' ').trim();
   return {
     title: `${person} te mandou uma mensagem 💬`,
     body: excerpt.length > 200 ? excerpt.slice(0, 197) + '…' : excerpt || 'Nova mensagem no Duet.',
