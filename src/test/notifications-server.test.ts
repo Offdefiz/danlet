@@ -94,8 +94,8 @@ describe('Reminder markers', () => {
   it('uses the same durable marker and skips an already claimed reminder window', async () => {
     selectMarker.mockResolvedValueOnce({ data: [{ id: 'marker-test' }], error: null })
       .mockResolvedValueOnce({ data: [], error: null });
-    expect(await sendDueInspirations(day)).toEqual({ sent: 1, slot: 'h10', proposal: false });
-    expect(await sendDueInspirations(day)).toEqual({ sent: 0, slot: 'h10', proposal: false });
+    expect(await sendDueInspirations(day)).toEqual({ sent: 1, slot: 't10-20', proposal: false });
+    expect(await sendDueInspirations(day)).toEqual({ sent: 0, slot: 't10-20', proposal: false });
     expect(boundary.pushTo).toHaveBeenCalledTimes(1);
     const first = upsertMarker.mock.calls[0]!;
     const second = upsertMarker.mock.calls[1]!;
@@ -105,7 +105,7 @@ describe('Reminder markers', () => {
 
   it('releases a failed reminder marker without logging its raw error', async () => {
     boundary.pushTo.mockRejectedValue(new Error('sensitive-test-marker'));
-    expect(await sendDueInspirations(day)).toEqual({ sent: 0, slot: 'h10', proposal: false });
+    expect(await sendDueInspirations(day)).toEqual({ sent: 0, slot: 't10-20', proposal: false });
     expect(removeMarker).toHaveBeenCalledTimes(1);
     expect(console.error).toHaveBeenCalledWith('Falha ao enviar aviso proativo do Duet');
     expect(console.error).not.toHaveBeenCalledWith(expect.anything(), expect.anything());
