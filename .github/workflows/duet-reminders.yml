@@ -5,9 +5,9 @@ on:
     branches: [main]
     paths: ['.github/workflows/duet-reminders.yml']
   schedule:
-    # Every 20 minutes, 09:07-21:47 America/Sao_Paulo (UTC-3).
-    # GitHub may delay scheduled jobs; the server verifies local quiet hours.
-    - cron: '7,27,47 0,12-23 * * *'
+    # Approximately every 20 minutes, 24 hours a day. GitHub may delay
+    # or skip scheduled runs; server-side slot IDs prevent duplicate pushes.
+    - cron: '7,27,47 * * * *'
   workflow_dispatch:
 
 # Request a short-lived signed identity; NO static repo secret is necessary.
