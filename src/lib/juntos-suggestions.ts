@@ -47,3 +47,15 @@ export function parseProposalLink(search: string): string | null {
   return /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ? id : null;
 }
 export function newSuggestionDate(now = new Date()) { return brazilianToday(now); }
+
+/** Keep historical decisions out of the live Juntos list. Missed dates count
+ * as history even if neither partner pressed an explicit "no".
+ */
+export function proposalSection(
+  proposal: { status: string; date: string },
+  today: string,
+): 'pending' | 'agreed' | 'history' {
+  if (proposal.status === 'agreed') return 'agreed';
+  if (proposal.status === 'declined' || proposal.date < today) return 'history';
+  return 'pending';
+}
