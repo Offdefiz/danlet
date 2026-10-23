@@ -19,3 +19,27 @@ export const syncPartnerNotifications = createServerFn({ method: 'POST' })
     const { drainPartnerPush } = await import('@/lib/notifications.server');
     return { sent: await drainPartnerPush() };
   });
+
+// A signed-in user may send a test push only to their own registered devices.
+// The server derives the recipient from the verified session, never from client input.
+const lastTestByUser = new Map<string, number>();
+export const sendSelfPushTest = createServerFn({ method: 'POST' })
+  .middleware([requireSupabaseAuth])
+  .handler(async ({ context }) => {
+    const { data: member, error } = await context.supabase.from('couple_members')
+      .select('user_id').eq('user_id', context.userId).maybeSingle();
+    if (error || !member) throw new Error('Acesso reservado ao casal.');
+    const now = Date.now();
+    const previous = lastTestByUser.get(context.userId) ?? 0;
+    if (now - previous < 60_000) throw new Error('Aguarde um minuto entre testes de notificação.');
+    lastTestByUser.set(context.userId, now);
+    try {
+      const { pushTo } = await import('@/lib/push.server');
+      const sent = await pushTo([context.userId], 'Teste de notificação do Duet ♡',
+        'Se você recebeu este aviso no iPhone, o push está funcionando!', 'duet-self-test');
+      return { sent };
+    } catch (err) {
+      lastTestByUser.delete(context.userId);
+      throw err;
+    }
+  });
