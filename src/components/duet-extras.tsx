@@ -12,6 +12,7 @@ import { enablePush } from '@/lib/push-client';
 import type { Row } from '@/lib/duet.types';
 import { syncPartnerNotifications, sendSelfPushTest } from '@/lib/notifications.functions';
 import { playDuetSound } from '@/lib/duet-sounds';
+import { usePartnerOnline } from '@/hooks/use-partner-online';
 
 export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'profiles'> | undefined; name: string; size?: number; onPick?: (f: File) => void }) {
   const [url, setUrl] = useState('');
@@ -21,10 +22,10 @@ export function Avatar({ profile, name, size = 36, onPick }: { profile?: Row<'pr
   return <label className="cursor-pointer" title="Trocar foto de perfil">{face}<input type="file" accept="image/*" className="sr-only" aria-label="Trocar foto de perfil" onChange={e => { const f = e.target.files?.[0]; if (f) onPick(f); }}/></label>;
 }
 
-export function Chat({ userId, me, partner, messages, profiles }: { userId: string; me: string; partner: string; messages: Row<'messages'>[]; profiles: Row<'profiles'>[] }) {
+export function Chat({ userId, partnerId, me, partner, messages, profiles }: { userId: string; partnerId: string | undefined; me: string; partner: string; messages: Row<'messages'>[]; profiles: Row<'profiles'>[] }) {
   const [open, setOpen] = useState(false);
   useEffect(() => { const show = () => setOpen(true); window.addEventListener('duet:open-chat', show); return () => window.removeEventListener('duet:open-chat', show); }, []);
-  const [online, setOnline] = useState(false);
+  const { online, checking } = usePartnerOnline(userId, partnerId);
   const [text, setText] = useState('');
   const [outgoing, setOutgoing] = useState<Array<{ id: string; body: string; user_id: string; created_at: string; status: 'sending' | 'sent' }>>([]);
   const cache = useQueryClient();
@@ -36,12 +37,6 @@ export function Chat({ userId, me, partner, messages, profiles }: { userId: stri
   }, [messages]);
   const visibleMessages = [...messages, ...outgoing.filter(message => !messages.some(saved => saved.id === message.id))]
     .sort((a, b) => a.created_at.localeCompare(b.created_at));
-  useEffect(() => {
-    const ch = supabase.channel('duet-presence', { config: { presence: { key: userId } } });
-    ch.on('presence', { event: 'sync' }, () => setOnline(Object.keys(ch.presenceState()).some(k => k !== userId)))
-      .subscribe(s => { if (s === 'SUBSCRIBED') void ch.track({ at: Date.now() }); });
-    return () => { void supabase.removeChannel(ch); };
-  }, [userId]);
   useEffect(() => { if (open) end.current?.scrollIntoView(); }, [open, visibleMessages.length]);
   async function send(e: React.FormEvent) {
     e.preventDefault();
@@ -67,9 +62,9 @@ export function Chat({ userId, me, partner, messages, profiles }: { userId: stri
   }
   const partnerProfile = profiles.find(p => p.id !== userId);
   return <>
-    <Button variant="ghost" size="icon" title="Conversa" aria-label="Abrir conversa" onClick={() => setOpen(true)} className="relative"><MessageCircle size={18}/><span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : 'bg-muted-foreground/40'}`}/></Button>
+    <Button variant="ghost" size="icon" title={`Conversa · ${partner} ${checking ? 'verificando conexão' : online ? 'online agora' : 'offline'}`} aria-label={`Abrir conversa · ${partner} ${checking ? 'verificando conexão' : online ? 'online' : 'offline'}`} onClick={() => setOpen(true)} className="relative"><MessageCircle size={18}/><span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : checking ? 'bg-amber-400' : 'bg-muted-foreground/40'}`}/></Button>
     <Dialog open={open} onOpenChange={setOpen}><DialogContent className="flex max-h-[85vh] flex-col">
-      <DialogHeader><DialogTitle className="flex items-center gap-3"><Avatar profile={partnerProfile} name={partner}/><span>{partner}<span className={`block text-xs font-normal ${online ? 'text-success' : 'text-muted-foreground'}`}>{online ? 'online agora' : 'offline'}</span></span></DialogTitle></DialogHeader>
+      <DialogHeader><DialogTitle className="flex items-center gap-3"><Avatar profile={partnerProfile} name={partner}/><span>{partner}<span className={`block text-xs font-normal ${online ? 'text-success' : 'text-muted-foreground'}`}>{online ? 'online agora' : checking ? 'verificando presença…' : 'offline'}</span></span></DialogTitle></DialogHeader>
       <div className="min-h-48 flex-1 space-y-2 overflow-y-auto py-2">{visibleMessages.map(m => <div key={m.id} className={`flex ${m.user_id === userId ? 'justify-end' : ''}`}><p className={`max-w-[80%] whitespace-pre-wrap rounded-2xl px-3 py-2 text-sm ${m.user_id === userId ? 'bg-primary text-primary-foreground' : 'bg-secondary'}`}>{m.body}<span className="mt-1 block text-[10px] opacity-70">{'status' in m && m.status === 'sending' ? 'Enviando… · ' : ''}{new Date(m.created_at).toLocaleString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span></p></div>)}{!visibleMessages.length && <p className="text-center text-sm text-muted-foreground">Mande um oi para {partner}, {me}. ♡</p>}<div ref={end}/></div>
       <form onSubmit={send} className="flex gap-2"><Input value={text} onChange={e => setText(e.target.value)} placeholder="Escreva uma mensagem…" maxLength={2000}/><Button size="icon" aria-label="Enviar"><Send/></Button></form>
     </DialogContent></Dialog>
