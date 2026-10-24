@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.1', date: '2026-10-24', title: 'Dream Match com fotos de verdade',
+    kind: 'Correções',
+    highlights: [
+      'A busca de Pampulha agora oferece resultados públicos do Instagram com fotos, mesmo quando o serviço de pesquisa externa não está configurado.',
+      'Sugestões visuais de decoração do Pinterest também ficam disponíveis no catálogo inicial, com prévias públicas.',
+      'Miniaturas públicas do Instagram e Pinterest podem ser salvas no Dream Match como links de mídia, sem copiar fotografias de terceiros.',
+      'Caso uma miniatura não carregue, o Duet tenta exibir a incorporação original; você também pode anexar uma foto autorizada.',
+      'Busca externa direta de Instagram ou Pinterest disponível dentro do fluxo, sem mensagens técnicas sobre chaves de API.',
+    ],
+  },
+  {
     version: '2.8.0', date: '2026-10-23', title: 'Dream Match de verdade ♡',
     kind: 'Novidades',
     highlights: [
