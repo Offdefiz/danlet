@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.3', date: '2026-10-24', title: 'Qualquer lugar, novas descobertas',
+    kind: 'Melhorias',
+    highlights: [
+      'A pesquisa de fotos do Dream Match agora tenta buscar novas localidades em tempo real usando o modo gratuito do Firecrawl, mesmo sem chave configurada.',
+      'Busque bairro, cidade, região ou país: resultados de locais continuam restritos ao Instagram e decoração a Pins do Pinterest.',
+      'A pesquisa une resultados de páginas e imagens públicas, preserva a publicação original e usa sua miniatura quando disponível.',
+      'A busca gratuita tem um limite diário por IP; se ele for atingido, o Duet oferece a pesquisa visual diretamente nas plataformas.',
+      'Menos requisições de metadados por busca, para preservar os limites gratuitos e manter a interface rápida.',
+    ],
+  },
+  {
     version: '2.8.2', date: '2026-10-24', title: 'Buscar inspirações em qualquer lugar',
     kind: 'Melhorias',
     highlights: [

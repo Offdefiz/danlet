@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import { generateKeyPairSync, verify } from 'node:crypto';
 import { firebaseAccessToken, firebaseCredentials } from '@/lib/firebase-direct.server';
-import { isPublicHttpsUrl, searchWeb, SearchNotConfigured } from '@/lib/firecrawl-direct.server';
+import { isPublicHttpsUrl, searchWeb } from '@/lib/firecrawl-direct.server';
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
 describe('Independent providers', () => {
   it('rejects unsafe URL schemes and local network resources', () => {
@@ -26,9 +26,58 @@ describe('Independent providers', () => {
     expect(fake.mock.calls[0]?.[1]?.headers).not.toHaveProperty('X-Connection-Api-Key');
     expect(fake.mock.calls[0]?.[1]?.headers?.Authorization).toBe('Bearer test-key');
   });
-  it('reports missing optional search key without contacting a gateway', async () => {
+  it('uses the official free keyless Firecrawl tier for an arbitrary region', async () => {
     vi.stubEnv('FIRECRAWL_API_KEY', '');
-    await expect(searchWeb('casamento')).rejects.toBeInstanceOf(SearchNotConfigured);
+    const fake = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({ success: true, data: {
+        web: [{ title: 'Espaço em Tiradentes', url: 'https://www.instagram.com/p/Tira1234/', description: 'Casamento em Tiradentes' }],
+        images: [{
+          title: 'Espaço em Tiradentes', url: 'https://www.instagram.com/p/Tira1234/',
+          imageUrl: 'https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=3882650950662597379',
+        }],
+      } }),
+    });
+    vi.stubGlobal('fetch', fake);
+    const results = await searchWeb('casamento em Tiradentes MG site:instagram.com', 8);
+    expect(results).toHaveLength(1);
+    expect(results[0]?.image).toContain('lookaside.instagram.com');
+    expect(fake).toHaveBeenCalledOnce();
+    const [endpoint, options] = fake.mock.calls[0]!;
+    expect(endpoint).toBe('https://api.firecrawl.dev/v2/search');
+    expect(options.headers).not.toHaveProperty('Authorization');
+    expect(options.headers).toHaveProperty('Content-Type', 'application/json');
+    expect(JSON.parse(options.body).sources).toEqual([{ type: 'web' }, { type: 'images' }]);
+  });
+  it('prioritizes image-index matches over ten text-only web matches', async () => {
+    vi.stubEnv('FIRECRAWL_API_KEY', '');
+    const fake = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({
+        success: true,
+        data: {
+          web: Array.from({ length: 10 }, (_, i) => ({
+            title: 'Evento sem foto ' + i,
+            url: 'https://www.instagram.com/perfil' + i + '/',
+            description: 'Foto de evento em Tiradentes',
+          })),
+          images: Array.from({ length: 5 }, (_, i) => ({
+            title: 'Lugar com foto ' + i,
+            url: 'https://www.instagram.com/p/foto' + i + '/',
+            imageUrl: 'https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=' + String(3882650950662597300n + BigInt(i)),
+          })),
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fake);
+    const items = await searchWeb('casamento em São José dos Campos site:instagram.com', 10);
+    expect(items).toHaveLength(10);
+    expect(items.slice(0, 5).every(item => Boolean(item.image))).toBe(true);
+    expect(items[0]?.title).toBe('Lugar com foto 0');
+    expect(items.slice(5).every(item => !item.image)).toBe(true);
+  });
+  it('explains daily keyless rate limiting without exposing API credentials', async () => {
+    vi.stubEnv('FIRECRAWL_API_KEY', '');
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 }));
+    await expect(searchWeb('casamento em Paris França', 6)).rejects.toThrow('limite temporário');
   });
   it('signs an OAuth assertion for direct Firebase HTTP v1', async () => {
     const { privateKey, publicKey } = generateKeyPairSync('rsa', { modulusLength: 2048 });

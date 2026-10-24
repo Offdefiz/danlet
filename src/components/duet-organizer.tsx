@@ -16,7 +16,7 @@ import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.fun
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
 import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
-import { socialImageSearchUrl, socialSearchSource, needsLiveSearchConfig } from '@/lib/dream-anywhere';
+import { socialImageSearchUrl, socialSearchSource, shouldOfferExternalDreamSearch } from '@/lib/dream-anywhere';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -589,11 +589,11 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </label>
       <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
       {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
-      {needsLiveSearchConfig(dreamSearchMode ?? '', results.length) && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/45 p-4">
+      {shouldOfferExternalDreamSearch(dreamSearchMode ?? '', results.length) && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/45 p-4">
         <p className="text-sm font-semibold">Pesquisar além da lista inicial</p>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Para trazer resultados de qualquer lugar diretamente para esta tela, ainda precisamos conectar o serviço de pesquisa do Duet.
-          Enquanto isso, você pode procurar fotos de qualquer cidade filtradas para {socialSearchSource(category)} e salvar as publicações que gostar.
+          Não encontrei fotografias públicas disponíveis nesta tentativa, ou a busca gratuita atingiu seu limite.
+          Você ainda pode procurar fotos de qualquer cidade filtradas para {socialSearchSource(category)} e salvar as publicações que gostar.
         </p>
         <Button asChild className="w-full rounded-2xl">
           <a href={socialImageSearchUrl(category, region)} target="_blank" rel="noopener noreferrer">
