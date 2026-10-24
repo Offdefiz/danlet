@@ -20,8 +20,8 @@ export const findReferences = createServerFn({ method: 'POST' })
       ? `espaço casamento local eventos ${region} site:instagram.com`
       : `decoração casamento ${region} site:pinterest.com/pin/`;
     try {
-      const found = await searchWeb(query, 16);
-      const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 12);
+      const found = await searchWeb(query, 10);
+      const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 10);
       // Keyless queries are capped per IP. Search already supplies image
       // thumbnails, so use at most one optional social-page scrape, rather
       // than a burst of 12 scrape calls that would exhaust the free limit.
