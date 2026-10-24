@@ -34,6 +34,16 @@ jobs:
               echo 'Every visible product change requires a note in src/lib/release-notes.ts'
               exit 1
             fi
+            previous=$(git show "origin/$BASE_BRANCH:src/lib/release-notes.ts" | sed -nE "s/^[[:space:]]*version: '([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" | head -n 1)
+            current=$(sed -nE "s/^[[:space:]]*version: '([0-9]+\\.[0-9]+\\.[0-9]+)'.*/\\1/p" src/lib/release-notes.ts | head -n 1)
+            if [[ -z "$previous" || -z "$current" || "$previous" == "$current" ]]; then
+              echo 'Each product release must bump the version in release-notes.ts, not only edit the changelog.'
+              exit 1
+            fi
+            if [[ "$(printf '%s\n' "$previous" "$current" | sort -V | tail -n 1)" != "$current" ]]; then
+              echo "Release version $current must be newer than $previous."
+              exit 1
+            fi
           fi
       - name: Run automated tests
         run: bun run test
