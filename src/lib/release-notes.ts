@@ -110,6 +110,8 @@ export const postMigrationHighlights = [
       'Aceites, recusas e confirmações de acordo geram avisos próprios; a resposta do outro nunca é presumida.',
       'Propostas recusadas ou com data vencida ficam no Histórico, sem poluir o Juntos.',
       'Botão Reenviar notificação para lembrar quem ainda não respondeu, sem duplicar a proposta.',
+      'Dream Match em Descobrir, Super Likes individuais, Matches confirmados pelos dois e Histórico separados.',
+      'Locais descobertos pelo Instagram e decoração em Pins do Pinterest, com fotos obrigatórias e recuperação das referências antigas sem imagem.',
     ],
   },
   {
