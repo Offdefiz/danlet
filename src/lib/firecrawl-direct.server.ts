@@ -53,26 +53,28 @@ export async function searchWeb(query: string, limit = 8): Promise<SearchHit[]> 
   const images = !Array.isArray(result.data) ? result.data?.images ?? [] : [];
   // Image discovery is *indexed*, not a license to reproduce the photograph.
   // Each preview remains on the original publisher's public CDN.
-  const imageByPost = new Map<string, string>();
+  const validWeb = entries.filter(v => typeof v?.title === 'string' &&
+    typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
+    .map(v => ({ title: v.title, url: v.url, description: v.description ?? '' }));
+  const webByUrl = new Map(validWeb.map(item => [item.url, item]));
+  const photographed = new Map<string, SearchHit>();
   for (const image of images) {
-    if (image.url && image.imageUrl && isPublicHttpsUrl(image.url) && isPublicHttpsUrl(image.imageUrl)) {
-      imageByPost.set(image.url, image.imageUrl);
-    }
+    if (!image.url || !image.imageUrl || !isPublicHttpsUrl(image.url)
+        || !isPublicHttpsUrl(image.imageUrl)) continue;
+    const matched = webByUrl.get(image.url);
+    photographed.set(image.url, {
+      title: matched?.title ?? image.title ?? 'Inspiração visual',
+      url: image.url,
+      description: matched?.description ?? '',
+      image: image.imageUrl,
+    });
   }
-  const results: SearchHit[] = entries.filter(v => typeof v?.title === 'string' && typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
-    .map(v => ({
-      title: v.title, url: v.url, description: v.description ?? '',
-      ...(imageByPost.has(v.url) ? { image: imageByPost.get(v.url)! } : {}),
-    }));
-  // An image search result often lists a specific *post* where web results
-  // list only a broad profile. Include such real posts too, never the CDN URL
-  // as the original source.
-  for (const image of images) {
-    if (!image.url || !image.imageUrl || !image.title || !isPublicHttpsUrl(image.url)
-        || !isPublicHttpsUrl(image.imageUrl) || results.some(item => item.url === image.url)) continue;
-    results.push({ title: image.title, url: image.url, description: '', image: image.imageUrl });
-  }
-  results.splice(limit);
+  // Use photographic results first. Without this, 10 text-only web hits
+  // filled the result cap and hid all the separately indexed Instagram photos.
+  const results: SearchHit[] = [
+    ...photographed.values(),
+    ...validWeb.filter(item => !photographed.has(item.url)),
+  ].slice(0, limit);
   if (searchCache.size >= 100) searchCache.delete(searchCache.keys().next().value ?? '');
   searchCache.set(cacheKey, { expiresAt: Date.now() + 15 * 60_000, results });
   return results.map(item => ({ ...item }));
