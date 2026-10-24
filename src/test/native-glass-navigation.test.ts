@@ -9,7 +9,8 @@ describe('native-like floating tab bar', () => {
     const scroll = vi.fn();
     const schedule = vi.fn();
     expect(pressBottomTab('home','home',setTab,scroll,schedule,false)).toBe('scroll-top');
-    expect(scroll).toHaveBeenCalledExactlyOnceWith('smooth');
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll).toHaveBeenCalledWith('smooth');
     expect(setTab).not.toHaveBeenCalled();
     expect(schedule).not.toHaveBeenCalled();
   });
@@ -24,11 +25,13 @@ describe('native-like floating tab bar', () => {
     let pending: (() => void) | null = null;
     const schedule = vi.fn((fn: () => void) => { pending = fn; });
     expect(pressBottomTab('calendar','home',setTab,scroll,schedule)).toBe('navigate');
-    expect(setTab).toHaveBeenCalledExactlyOnceWith('calendar');
+    expect(setTab).toHaveBeenCalledOnce();
+    expect(setTab).toHaveBeenCalledWith('calendar');
     expect(scroll).not.toHaveBeenCalled();
     expect(schedule).toHaveBeenCalledOnce();
     if (pending) (pending as () => void)();
-    expect(scroll).toHaveBeenCalledExactlyOnceWith('instant');
+    expect(scroll).toHaveBeenCalledOnce();
+    expect(scroll).toHaveBeenCalledWith('instant');
   });
   it('keeps accessible nav ordering and room for five finger-sized targets', () => {
     expect(primaryTabs.map(item => item.label)).toEqual(['Início','Dream','Juntos','Agenda']);
