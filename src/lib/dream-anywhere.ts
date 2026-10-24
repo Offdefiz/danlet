@@ -29,6 +29,6 @@ export function socialSearchSource(category: string): string {
   return category === 'Decoração' ? 'Pinterest' : 'Instagram';
 }
 
-export function needsLiveSearchConfig(mode: string, resultsCount: number): boolean {
+export function shouldOfferExternalDreamSearch(mode: string, resultsCount: number): boolean {
   return mode === 'unavailable' && resultsCount === 0;
 }
