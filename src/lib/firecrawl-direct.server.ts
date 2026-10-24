@@ -48,7 +48,7 @@ export async function searchWeb(query: string, limit = 8): Promise<SearchHit[]> 
   if (cached && Date.now() < cached.expiresAt) {
     return cached.results.map(item => ({ ...item }));
   }
-  const result = await api('/search', { query, limit, sources: [{ type: 'web' }, { type: 'images' }], country: 'BR' }) as SearchPayload;
+  const result = await api('/search', { query, limit, sources: [{ type: 'web' }, { type: 'images' }] }) as SearchPayload;
   const entries = Array.isArray(result.data) ? result.data : result.data?.web ?? [];
   const images = !Array.isArray(result.data) ? result.data?.images ?? [] : [];
   // Image discovery is *indexed*, not a license to reproduce the photograph.
