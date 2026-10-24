@@ -62,7 +62,7 @@ describe('Independent providers', () => {
           images: Array.from({ length: 5 }, (_, i) => ({
             title: 'Lugar com foto ' + i,
             url: 'https://www.instagram.com/p/foto' + i + '/',
-            imageUrl: 'https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=' + (3882650950662597300 + i),
+            imageUrl: 'https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=' + String(3882650950662597300n + BigInt(i)),
           })),
         },
       }),
