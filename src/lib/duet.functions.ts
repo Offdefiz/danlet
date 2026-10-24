@@ -20,22 +20,28 @@ export const findReferences = createServerFn({ method: 'POST' })
       ? `espaço casamento local eventos ${region} site:instagram.com`
       : `decoração casamento ${region} site:pinterest.com/pin/`;
     try {
-      const found = await searchWeb(query, 10);
-      const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 8);
-      // Meta photos may be unavailable. Search results without media can still
-      // be reviewed using an official embed, but cannot enter swipe before photo.
+      const found = await searchWeb(query, 16);
+      const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 12);
       const results = await Promise.all(sites.map(async item => {
-        let image = '';
-        if (source === 'instagram') {
-          try { image = (await scrapeMeta(item.url)).image; } catch { /* blocked/public access denied */ }
+        let image = safeSocialPreviewUrl(item.image, data.category) ? item.image! : '';
+        if (!image && source === 'instagram') {
+          try {
+            const meta = await scrapeMeta(item.url);
+            if (safeSocialPreviewUrl(meta.image, data.category)) image = meta.image;
+          } catch { /* optional remote preview */ }
         }
         return { title: item.title, source_url: item.url, description: item.description ?? '', image };
       }));
-      return { results, error: results.length ? null
-        : 'Não encontrei publicações públicas do ' + (source === 'instagram' ? 'Instagram' : 'Pinterest') + ' com esse filtro. Tente outra cidade ou termo.' };
-    } catch (error) {
-      return { results: [], error: error instanceof Error ? error.message : 'Busca indisponível. Tente novamente.' };
-    }
+      if (results.length) return { results, error: null, mode: 'live' as const };
+    } catch { /* public curated references remain available offline */ }
+    const curated = curatedDreamResults(data.category, region);
+    return {
+      results: curated,
+      error: curated.length
+        ? 'Referências públicas selecionadas para essa região. As imagens são carregadas do Instagram ou Pinterest.'
+        : 'Ainda não há referências para essa pesquisa. Experimente outro termo ou adicione uma publicação.',
+      mode: curated.length ? 'curated' as const : 'unavailable' as const,
+    };
   });
 
 async function storeImage(supabase: SupabaseClient<Database>, userId: string, image: string) {
