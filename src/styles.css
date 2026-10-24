@@ -626,3 +626,60 @@
 @supports (padding-bottom: env(safe-area-inset-bottom)) {
   html { scroll-padding-bottom: calc(92px + env(safe-area-inset-bottom)); }
 }
+
+
+/* Chat behaves as a mobile-native conversation, not a scrollable webpage.
+   Radix locks body scrolling; containment and internal scrollTop prevent
+   the scroll gesture from leaking to the page underneath on iOS Safari. */
+body:has(.duet-chat-dialog[data-state="open"]) {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+.duet-chat-dialog {
+  overscroll-behavior: contain;
+  isolation: isolate;
+}
+.duet-chat-scroll {
+  min-height: 0;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
+  touch-action: pan-y;
+  scrollbar-width: thin;
+  scrollbar-color: var(--border) transparent;
+}
+.duet-chat-composer {
+  box-shadow: 0 -5px 16px rgb(0 0 0 / 0.045);
+}
+/* Accessible compact banner, displayed above other screens by Sonner. */
+[data-sonner-toast].duet-in-app-banner {
+  border-radius: 1.35rem;
+  border: 1px solid var(--border);
+  color: var(--foreground);
+  background: var(--popover);
+  box-shadow: 0 12px 34px rgb(0 0 0 / 0.20);
+  padding: 14px 16px;
+  width: min(100%, 460px);
+  overflow-wrap: anywhere;
+}
+[data-sonner-toast].duet-in-app-banner [data-button] {
+  border-radius: 999px;
+  min-height: 36px;
+  padding-inline: 14px;
+}
+@media (max-width: 640px) {
+  .app-shell article {
+    border-radius: 1.4rem;
+  }
+  .app-shell .glass-panel {
+    border-radius: 1.8rem;
+  }
+  .duet-chat-dialog {
+    border-radius: 1.75rem;
+  }
+  .duet-chat-composer input {
+    min-width: 0;
+  }
+  [data-sonner-toast].duet-in-app-banner {
+    width: min(100%, calc(100vw - 24px));
+  }
+}

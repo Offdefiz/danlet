@@ -12,6 +12,16 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.5.1', date: '2026-10-23', title: 'Conversa mais fluida',
+    kind: 'Melhorias',
+    highlights: [
+      'Chat abre sempre na última mensagem; só a conversa rola, sem mover a tela de trás.',
+      'Última vez online do parceiro no topo da conversa, com horário de Brasília.',
+      'Mensagem nova mostra uma notificação dentro do Duet, no topo, com o texto e atalho para o chat.',
+      'Botões, campos e janelas mais arredondados e melhor alinhados nos celulares.',
+    ],
+  },
+  {
     version: '2.5.0', date: '2026-10-23', title: 'O Duet ainda mais seu',
     kind: 'Novidades',
     highlights: [

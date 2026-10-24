@@ -13,6 +13,7 @@ export function usePartnerOnline(userId: string, partnerId: string | undefined) 
   const [socketOnline, setSocketOnline] = useState(false);
   const [serverOnline, setServerOnline] = useState(false);
   const [checking, setChecking] = useState(true);
+  const [lastSeen, setLastSeen] = useState<string | null>(null);
 
   useEffect(() => {
     if (!partnerId) {
@@ -30,7 +31,19 @@ export function usePartnerOnline(userId: string, partnerId: string | undefined) 
         channel.presenceState() as Record<string, unknown>, partnerId,
       );
       setSocketOnline(present);
-      if (present) setChecking(false);
+      if (present) {
+        // Supabase presence includes the partner's own most recent track time.
+        // It is newer than the 30-second durable heartbeat when online.
+        const presences = channel.presenceState()[partnerId];
+        if (Array.isArray(presences)) for (const entry of presences) {
+          if (!entry || typeof entry !== 'object') continue;
+          const raw = (entry as unknown as Record<string, unknown>)['at'];
+          if (typeof raw !== 'number' || !Number.isFinite(raw) || Math.abs(Date.now() - raw) > 120_000) continue;
+          const stamp = new Date(raw).toISOString();
+          setLastSeen(old => !old || Date.parse(stamp) > Date.parse(old) ? stamp : old);
+        }
+        setChecking(false);
+      }
     };
     const poll = async () => {
       if (!active || document.visibilityState !== 'visible' || !navigator.onLine) return;
@@ -38,6 +51,9 @@ export function usePartnerOnline(userId: string, partnerId: string | undefined) 
         const status = await checkPresence();
         if (!active) return;
         setServerOnline(status.online);
+        if (status.lastSeen && Number.isFinite(Date.parse(status.lastSeen))) {
+          setLastSeen(old => !old || Date.parse(status.lastSeen!) > Date.parse(old) ? status.lastSeen : old);
+        }
         setChecking(false);
       } catch {
         // A temporarily failed REST request must not turn a live WebSocket
@@ -95,5 +111,5 @@ export function usePartnerOnline(userId: string, partnerId: string | undefined) 
     };
   }, [userId, partnerId, checkPresence]);
 
-  return { online: socketOnline || serverOnline, checking };
+  return { online: socketOnline || serverOnline, checking, lastSeen };
 }
