@@ -27,7 +27,7 @@ afterEach(() => {
 
 describe('Personal themes stored on each device', () => {
   it('preserves the original palettes and adds glitter and purple chrome', () => {
-    expect(themes).toHaveLength(13);
+    expect(themes).toHaveLength(16);
     expect(themes.find(t => t.id === 'pink-glitter')?.label).toMatch(/Glitter/);
     expect(themes.find(t => t.id === 'metallic-purple')?.label).toBe('Metallic Purple');
   });
@@ -35,7 +35,7 @@ describe('Personal themes stored on each device', () => {
   it('shows Premium first, including two new freely available luxury themes', () => {
     expect(themeGroups.map(g => g.label)).toEqual(['Premium', 'Elegantes', 'Simples']);
     expect(themeGroups[0]?.themeIds).toEqual([
-      'pink-glitter', 'metallic-purple', 'black-diamond', 'champagne-gold',
+      'pink-glitter', 'metallic-purple', 'aqua-mercury', 'opal-holographic', 'midnight-stardust', 'black-diamond', 'champagne-gold',
     ]);
     const allIds = themeGroups.flatMap(group => group.themeIds);
     expect(new Set(allIds).size).toBe(13);
