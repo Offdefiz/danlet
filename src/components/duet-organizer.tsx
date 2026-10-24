@@ -16,6 +16,7 @@ import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.fun
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
 import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
+import { socialImageSearchUrl, socialSearchSource, needsLiveSearchConfig } from '@/lib/dream-anywhere';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -56,6 +57,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [results, setResults] = useState<SearchItem[]>([]);
   const [region, setRegion] = useState('');
   const [searchError, setSearchError] = useState('');
+  const [dreamSearchMode, setDreamSearchMode] = useState<'live' | 'curated' | 'unavailable' | null>(null);
   const [addReference, setAddReference] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -170,10 +172,16 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     await mutate(() => supabase.from('records').insert({ kind: 'goal', title: ref.title, body: ref.description, reference_id: ref.id, created_by: userId, updated_by: userId, period: 'Médio Prazo' }));
   }
   async function runSearch() {
-    setBusy(true); setSearchError(''); setResults([]);
-    try { const found = await search({ data: { category, region } }); setResults(found.results); setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma fonte encontrada nesta busca.')); }
-    catch (err) { setSearchError(err instanceof Error ? err.message : 'Não foi possível pesquisar.'); }
-    finally { setBusy(false); }
+    setBusy(true); setSearchError(''); setDreamSearchMode(null); setResults([]);
+    try {
+      const found = await search({ data: { category, region: region.trim() } });
+      setResults(found.results);
+      setDreamSearchMode(found.mode);
+      setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma foto pública encontrada para essa pesquisa.'));
+    } catch {
+      setDreamSearchMode('unavailable');
+      setSearchError('A pesquisa interna não está disponível agora. Você pode procurar fotos da região e adicioná-las ao Dream Match.');
+    } finally { setBusy(false); }
   }
   async function uploadDreamPhoto(file: File): Promise<string> {
     const prepared = await optimizeDreamPhoto(file);
