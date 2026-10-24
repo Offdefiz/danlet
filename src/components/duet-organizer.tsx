@@ -244,12 +244,19 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     if (ok) toast.success('Foto otimizada e atualizada ♡');
   }
   async function upload(file: File, ref: Row<'references_catalog'>) {
-    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { toast.error('Escolha uma imagem de até 10 MB.'); return; }
-    const path = `${userId}/${crypto.randomUUID()}.${file.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '') || 'jpg'}`;
-    await mutate(async () => {
-      const sent = await supabase.storage.from('duet-photos').upload(path, file); if (sent.error) return sent;
-      return supabase.from('references_catalog').update({ image_path: path, image_credit: `Foto enviada por ${me?.person ?? 'nós'}` }).eq('id', ref.id);
-    });
+    setBusy(true);
+    try {
+      const path = await uploadDreamPhoto(file);
+      const { error } = await supabase.from('references_catalog').update({
+        image_path: path,
+        image_credit: 'Foto autorizada enviada pelo casal',
+      }).eq('id', ref.id);
+      if (error) throw error;
+      toast.success('Foto salva! A referência já pode aparecer no Dream Match.');
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao adicionar foto.');
+    } finally { setBusy(false); }
   }
   async function signOut() { await cache.cancelQueries(); cache.clear(); await supabase.auth.signOut(); window.history.replaceState(null, '', '/'); }
   if (query.isPending) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Abrindo nosso espaço…</div>;
@@ -531,9 +538,106 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     </div>
   </DialogContent></Dialog>
   <Dialog open={Boolean(form)} onOpenChange={o => { if (!o) setForm(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{form?.id ? 'Editar' : 'Adicionar'} {form?.kind === 'goal' ? 'meta' : form?.kind === 'task' ? 'próximo passo' : form?.kind === 'setting' ? 'data do casamento' : 'anotação'}</DialogTitle></DialogHeader>{form && <form onSubmit={saveRecord} className="space-y-4">{form.kind !== 'setting' && <label className="block text-sm">Título<Input required value={form.title} onChange={e => setForm({ ...form,title:e.target.value })} className="mt-2" maxLength={200}/></label>}<label className="block text-sm">{form.kind === 'setting' ? 'Data' : 'Anotações'}{form.kind === 'setting' ? <Input type="date" required value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2"/> : <Textarea value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2 min-h-28" maxLength={10000}/>}</label>{form.kind === 'goal' && <Select label="Prazo" value={form.period} onChange={v => setForm({ ...form,period:v })} options={periods} noAll/>}<Button disabled={busy} className="w-full">{busy ? 'Salvando…' : 'Salvar'}</Button></form>}</DialogContent></Dialog>
-  <Dialog open={Boolean(detail)} onOpenChange={o => { if (!o) setDetail(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{detail?.title}</DialogTitle></DialogHeader>{detail && <><ReferencePhoto reference={data.references.find(r => r.id === detail.id) ?? detail}/><p className="text-sm text-muted-foreground">{detail.description}</p><p className="text-xs text-success">{partnerName}: {voteLabel(partnerVote(data.votes,detail.id,userId))}</p><div className="flex flex-wrap gap-2">{detail.instagram_url && <Button asChild variant="outline"><a href={detail.instagram_url} target="_blank" rel="noreferrer"><Instagram/>Instagram</a></Button>}<Button asChild variant="outline"><a href={detail.source_url} target="_blank" rel="noreferrer"><ExternalLink/>Fonte</a></Button></div><label className="flex cursor-pointer items-center gap-2 text-sm text-primary"><Camera size={16}/>Enviar foto autorizada<input aria-label="Enviar foto autorizada" type="file" accept="image/*" className="sr-only" onChange={e => { const file = e.target.files?.[0]; if (file) void upload(file,detail); }}/></label><Section title="Nossas anotações" action={<Button size="icon" variant="ghost" title="Adicionar nota ao local" onClick={() => newRecord('note',detail.id)}><Plus/></Button>}/>{recordsList(data.records.filter(r => r.kind === 'note' && r.reference_id === detail.id))}{isMatch(data.votes,detail.id) && !goals.some(g => g.reference_id === detail.id) && <Button disabled={busy} onClick={() => promote(detail)}>Levar match aos planos</Button>}</>}</DialogContent></Dialog>
-  <Dialog open={searchOpen} onOpenChange={setSearchOpen}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Novas descobertas · {category}</DialogTitle></DialogHeader><label className="text-sm">Cidade ou estado<Input value={region} onChange={e => setRegion(e.target.value)} placeholder="Ex.: Tiradentes, MG" className="mt-2" maxLength={100}/></label><Button disabled={busy} onClick={runSearch}><Search/>{busy ? 'Pesquisando…' : 'Pesquisar'}</Button>{searchError && <p role="status" className={`text-sm ${results.length ? 'text-muted-foreground' : 'text-danger'}`}>{searchError}</p>}{rankedResults.map(r => <div key={r.source_url} className="border-t border-border pt-4"><h3 className="font-medium">{r.title}</h3><p className="mt-2 text-xs text-muted-foreground">{r.description}</p><div className="mt-3 flex gap-2"><Button asChild variant="outline" size="sm"><a href={r.source_url} target="_blank" rel="noreferrer">Revisar fonte<ExternalLink/></a></Button><Button size="sm" disabled={busy || data.references.some(x => x.source_url === r.source_url && x.title === r.title)} onClick={() => include(r)}><Plus/>Incluir para avaliar</Button></div></div>)}</DialogContent></Dialog>
-  <Dialog open={addReference} onOpenChange={setAddReference}><DialogContent><DialogHeader><DialogTitle>Adicionar referência · {category}</DialogTitle></DialogHeader><form onSubmit={saveReference} className="space-y-4"><label className="block text-sm">@ do Instagram<Input required autoFocus value={refInsta} onChange={e => setRefInsta(e.target.value)} placeholder="@villapaolucci" className="mt-2"/><span className="mt-1 block text-xs text-muted-foreground">Nome e foto são buscados automaticamente.</span></label><label className="block text-sm">Anotações<Textarea value={refDescription} onChange={e => setRefDescription(e.target.value)}/></label><Button disabled={busy} className="w-full">{busy ? 'Buscando perfil…' : 'Adicionar'}</Button></form></DialogContent></Dialog>
+  <Dialog open={Boolean(detail)} onOpenChange={open => { if (!open) setDetail(null); }}>
+    <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>{detail?.title}</DialogTitle></DialogHeader>
+      {detail && <>
+        <DreamReferencePhoto reference={data.references.find(ref => ref.id === detail.id) ?? detail}/>
+        <p className="text-sm text-muted-foreground">{detail.description}</p>
+        <p className="text-xs font-semibold text-primary">{partnerName}: {voteLabel(partnerVote(data.votes,detail.id,userId))}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><a href={detail.source_url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={16}/> {detail.category === 'Decoração' ? 'Pinterest original' : 'Instagram original'}
+          </a></Button>
+          {hasDreamPhoto(detail) && <Button variant="outline"
+            disabled={busy} onClick={() => void vote(detail,true,true)}><Star size={16}/> Super Like</Button>}
+        </div>
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-primary">
+          <Camera size={17}/> {detail.image_path ? 'Substituir foto' : 'Adicionar foto obrigatória'}
+          <input aria-label="Enviar foto autorizada" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            onChange={e => { const file=e.target.files?.[0]; if (file) void upload(file,detail); e.currentTarget.value=''; }}/>
+        </label>
+        <Section title="Nossas anotações" action={<Button size="icon" variant="ghost"
+          title="Adicionar nota à referência" onClick={() => newRecord('note',detail.id)}><Plus/></Button>}/>
+        {recordsList(data.records.filter(record => record.kind === 'note' && record.reference_id === detail.id))}
+        {isMatch(data.votes,detail.id) && !goals.some(goal => goal.reference_id === detail.id)
+          && <Button disabled={busy} onClick={() => promote(detail)}>Levar Match aos planos</Button>}
+      </>}
+    </DialogContent>
+  </Dialog>
+  <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+    <DialogContent className="max-h-[87dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>Buscar {category === 'Decoração' ? 'no Pinterest' : 'no Instagram'}</DialogTitle></DialogHeader>
+      <p className="text-xs text-muted-foreground">
+        {category === 'Decoração'
+          ? 'Somente Pins públicos do Pinterest. A foto aparece na prévia oficial; para salvar no baralho, anexe uma imagem permitida.'
+          : 'Somente perfis e publicações públicas do Instagram. Quando a rede não disponibiliza uma foto para uso no Duet, você pode anexar uma imagem autorizada.'}
+      </p>
+      <label className="text-sm">Região, estilo ou cidade
+        <Input value={region} onChange={e => setRegion(e.target.value)}
+          placeholder={category === 'Decoração' ? 'Ex.: jardim inglês, iluminação delicada' : 'Ex.: Tiradentes, MG'}
+          className="mt-2" maxLength={100}/>
+      </label>
+      <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
+      {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
+      {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
+        <h3 className="text-base font-semibold">{item.title}</h3>
+        {item.image && category !== 'Decoração'
+          ? <img src={item.image} alt={'Prévia pública no Instagram: ' + item.title}
+              className="mx-auto max-h-[310px] w-full rounded-2xl bg-muted object-contain" loading="lazy"/>
+          : <DreamPlatformPreview key={item.source_url} category={category} sourceUrl={item.source_url}/>}
+        <p className="text-xs text-muted-foreground">{item.description}</p>
+        <p className="text-xs text-muted-foreground">A imagem precisa estar vinculada antes de entrar no swipe.</p>
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/60 px-3 text-sm font-medium">
+          <Camera size={16}/>
+          {searchPhotoUrl === item.source_url && searchPhoto ? 'Foto selecionada ✓' : 'Anexar foto autorizada'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            aria-label={'Anexar foto de ' + item.title}
+            onChange={event => { const photo=event.target.files?.[0]; if (photo) {setSearchPhoto(photo);setSearchPhotoUrl(item.source_url);} event.currentTarget.value=''; }}/>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm"><a href={item.source_url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={14}/> Ver original
+          </a></Button>
+          <Button size="sm" disabled={busy || data.references.some(ref => ref.source_url===item.source_url)}
+            onClick={() => void include(item)}>
+            <Plus size={15}/> Salvar com foto
+          </Button>
+        </div>
+      </article>)}
+    </DialogContent>
+  </Dialog>
+  <Dialog open={addReference} onOpenChange={setAddReference}>
+    <DialogContent className="max-h-[86dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>Nova inspiração com fotografia ♡</DialogTitle></DialogHeader>
+      <form onSubmit={saveReference} className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          {category === 'Decoração' ? 'Decoração deve ter um link de Pin do Pinterest.' : 'Locais devem ter perfil ou publicação do Instagram.'}
+        </p>
+        <label className="block text-sm">Link original
+          <Input required value={refInsta} onChange={e => setRefInsta(e.target.value)}
+            placeholder={category === 'Decoração' ? 'https://www.pinterest.com/pin/123…/' : '@perfil ou https://www.instagram.com/p/…/'}
+            className="mt-2" maxLength={2000}/>
+        </label>
+        <label className="block text-sm">Nome da referência
+          <Input value={refTitle} onChange={e => setRefTitle(e.target.value)}
+            placeholder={category === 'Decoração' ? 'Mesa posta em jardim' : 'Local para o casamento'} maxLength={160} className="mt-2"/>
+        </label>
+        <label className="block text-sm">O que gostaram?
+          <Textarea value={refDescription} onChange={e => setRefDescription(e.target.value)} className="mt-2"/>
+        </label>
+        <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border border-primary/35 bg-secondary/35 px-4 text-sm">
+          <Camera size={22} className="text-primary"/>
+          <span>{manualPhoto ? 'Foto selecionada: ' + manualPhoto.name : 'Anexar fotografia (JPG, PNG ou WebP)'}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            aria-label="Anexar foto à nova inspiração"
+            onChange={event => { setManualPhoto(event.target.files?.[0] ?? null); event.currentTarget.value=''; }}/>
+        </label>
+        <p className="text-xs text-muted-foreground">O Instagram pode liberar a foto pública automaticamente. No Pinterest, é necessário anexar uma imagem que vocês possam usar.</p>
+        <Button type="submit" disabled={busy} className="w-full rounded-2xl">{busy ? 'Salvando foto…' : 'Adicionar ao Dream Match'}</Button>
+      </form>
+    </DialogContent>
+  </Dialog>
   </div>;
 }
 
@@ -541,9 +645,3 @@ function voteLabel(v: Row<'votes'> | undefined) { return v ? v.liked ? 'curtiu �
 function Section({ title, action }: { title: string; action?: React.ReactNode }) { return <div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-semibold">{title}</h2>{action}</div>; }
 function Empty({ text, action, onClick }: { text: string; action?: string; onClick?: () => void }) { return <div className="border-y border-dashed border-border py-9 text-center"><Flower2 className="mx-auto mb-4 text-success" size={28} strokeWidth={1.3}/><p className="mx-auto max-w-xs text-sm leading-relaxed text-muted-foreground">{text}</p>{action && <Button variant="outline" onClick={onClick} className="mt-5">{action}<Plus size={14}/></Button>}</div>; }
 function Select({ label, value, options, onChange, noAll }: { label: string; value: string; options: string[]; onChange: (s: string) => void; noAll?: boolean }) { return <label className="block min-w-0 text-[11px] text-muted-foreground">{label}<select aria-label={label} value={value} onChange={e => onChange(e.target.value)} className="mt-1 h-10 w-full min-w-0 rounded-md border border-input bg-card px-2 text-xs text-foreground">{!noAll && <option value="">Todos</option>}{options.map(o => <option key={o} value={o}>{o}</option>)}</select></label>; }
-function ReferencePhoto({ reference }: { reference: Row<'references_catalog'> }) {
-  const [url, setUrl] = useState('');
-  useEffect(() => { let active = true; setUrl(''); if (reference.image_path) void supabase.storage.from('duet-photos').createSignedUrl(reference.image_path,3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? ''); }); return () => { active = false; }; }, [reference.image_path]);
-  if (url) return <a href={reference.instagram_url ?? reference.source_url} target="_blank" rel="noreferrer" className="block"><img src={url} alt={reference.title} className="aspect-[4/3] w-full object-cover"/><span className="block px-3 py-1 text-[10px] text-muted-foreground">{reference.image_credit}</span></a>;
-  return <a href={reference.instagram_url ?? reference.source_url} target="_blank" rel="noreferrer" className="garden-band flex aspect-[16/7] flex-col items-center justify-center gap-3 border-b border-border text-success"><Flower2 size={36} strokeWidth={1.1}/><span className="flex items-center gap-2 text-xs"><ExternalLink size={12}/>{reference.instagram_url ? 'Fotos no Instagram oficial' : 'Ver fotos na fonte'}</span></a>;
-}
