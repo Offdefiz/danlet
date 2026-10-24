@@ -48,6 +48,32 @@ describe('Independent providers', () => {
     expect(options.headers).toHaveProperty('Content-Type', 'application/json');
     expect(JSON.parse(options.body).sources).toEqual([{ type: 'web' }, { type: 'images' }]);
   });
+  it('prioritizes image-index matches over ten text-only web matches', async () => {
+    vi.stubEnv('FIRECRAWL_API_KEY', '');
+    const fake = vi.fn().mockResolvedValue({
+      ok: true, json: async () => ({
+        success: true,
+        data: {
+          web: Array.from({ length: 10 }, (_, i) => ({
+            title: 'Evento sem foto ' + i,
+            url: 'https://www.instagram.com/perfil' + i + '/',
+            description: 'Foto de evento em Tiradentes',
+          })),
+          images: Array.from({ length: 5 }, (_, i) => ({
+            title: 'Lugar com foto ' + i,
+            url: 'https://www.instagram.com/p/foto' + i + '/',
+            imageUrl: 'https://lookaside.instagram.com/seo/google_widget/crawler/?media_id=' + (3882650950662597300 + i),
+          })),
+        },
+      }),
+    });
+    vi.stubGlobal('fetch', fake);
+    const items = await searchWeb('casamento em São José dos Campos site:instagram.com', 10);
+    expect(items).toHaveLength(10);
+    expect(items.slice(0, 5).every(item => Boolean(item.image))).toBe(true);
+    expect(items[0]?.title).toBe('Lugar com foto 0');
+    expect(items.slice(5).every(item => !item.image)).toBe(true);
+  });
   it('explains daily keyless rate limiting without exposing API credentials', async () => {
     vi.stubEnv('FIRECRAWL_API_KEY', '');
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue({ ok: false, status: 429 }));
