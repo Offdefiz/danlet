@@ -45,6 +45,8 @@ describe('Restricted social discovery without fake sources', () => {
   it('accepts only genuine Pinterest Pin pages for decorations', () => {
     expect(sourceForCategory('Decoração')).toBe('pinterest');
     expect(isDreamSourceUrl('https://br.pinterest.com/pin/123456789/', 'Decoração')).toBe(true);
+    expect(isDreamSourceUrl('https://fr.pinterest.com/pin/123456789/', 'Decoração')).toBe(true);
+    expect(isDreamSourceUrl('https://es.pinterest.com/pin/123456789/', 'Decoração')).toBe(true);
     expect(isDreamSourceUrl('https://www.pinterest.com/pin/123456789/', 'Decoração')).toBe(true);
     expect(pinId('https://www.pinterest.com/pin/123456789/')).toBe('123456789');
     expect(isDreamSourceUrl('https://pinterest.com/search/pins/?q=flowers', 'Decoração')).toBe(false);
