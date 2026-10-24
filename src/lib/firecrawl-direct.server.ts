@@ -2,8 +2,9 @@
 const API = 'https://api.firecrawl.dev/v2';
 // Public search queries only; each cache hit avoids a billable Firecrawl search.
 const searchCache = new Map<string, { expiresAt: number; results: SearchHit[] }>();
-export type SearchHit = { title: string; url: string; description?: string };
-type SearchPayload = { success?: boolean; data?: { web?: SearchHit[] } | SearchHit[] };
+export type SearchHit = { title: string; url: string; description?: string; image?: string };
+type ImageHit = { title?: string; url?: string; imageUrl?: string; imageWidth?: number; imageHeight?: number };
+type SearchPayload = { success?: boolean; data?: { web?: SearchHit[]; images?: ImageHit[] } | SearchHit[] };
 type ScrapePayload = { success?: boolean; data?: { metadata?: Record<string, unknown> }; metadata?: Record<string, unknown> };
 
 export class SearchNotConfigured extends Error {
@@ -42,10 +43,31 @@ export async function searchWeb(query: string, limit = 8): Promise<SearchHit[]> 
   if (cached && Date.now() < cached.expiresAt && process.env['FIRECRAWL_API_KEY']) {
     return cached.results.map(item => ({ ...item }));
   }
-  const result = await api('/search', { query, limit, sources: [{ type: 'web' }], country: 'BR' }) as SearchPayload;
+  const result = await api('/search', { query, limit, sources: [{ type: 'web' }, { type: 'images' }], country: 'BR' }) as SearchPayload;
   const entries = Array.isArray(result.data) ? result.data : result.data?.web ?? [];
-  const results = entries.filter(v => typeof v?.title === 'string' && typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
-    .slice(0, limit).map(v => ({ title: v.title, url: v.url, description: v.description ?? '' }));
+  const images = !Array.isArray(result.data) ? result.data?.images ?? [] : [];
+  // Image discovery is *indexed*, not a license to reproduce the photograph.
+  // Each preview remains on the original publisher's public CDN.
+  const imageByPost = new Map<string, string>();
+  for (const image of images) {
+    if (image.url && image.imageUrl && isPublicHttpsUrl(image.url) && isPublicHttpsUrl(image.imageUrl)) {
+      imageByPost.set(image.url, image.imageUrl);
+    }
+  }
+  const results: SearchHit[] = entries.filter(v => typeof v?.title === 'string' && typeof v?.url === 'string' && isPublicHttpsUrl(v.url))
+    .map(v => ({
+      title: v.title, url: v.url, description: v.description ?? '',
+      ...(imageByPost.has(v.url) ? { image: imageByPost.get(v.url)! } : {}),
+    }));
+  // An image search result often lists a specific *post* where web results
+  // list only a broad profile. Include such real posts too, never the CDN URL
+  // as the original source.
+  for (const image of images) {
+    if (!image.url || !image.imageUrl || !image.title || !isPublicHttpsUrl(image.url)
+        || !isPublicHttpsUrl(image.imageUrl) || results.some(item => item.url === image.url)) continue;
+    results.push({ title: image.title, url: image.url, description: '', image: image.imageUrl });
+  }
+  results.splice(limit);
   if (searchCache.size >= 100) searchCache.delete(searchCache.keys().next().value ?? '');
   searchCache.set(cacheKey, { expiresAt: Date.now() + 15 * 60_000, results });
   return results.map(item => ({ ...item }));
