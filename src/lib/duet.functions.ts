@@ -22,16 +22,25 @@ export const findReferences = createServerFn({ method: 'POST' })
     try {
       const found = await searchWeb(query, 16);
       const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 12);
-      const results = await Promise.all(sites.map(async item => {
+      // Keyless queries are capped per IP. Search already supplies image
+      // thumbnails, so use at most one optional social-page scrape, rather
+      // than a burst of 12 scrape calls that would exhaust the free limit.
+      let metaBudget = process.env['FIRECRAWL_API_KEY'] ? 3 : 1;
+      const results = [];
+      for (const item of sites) {
         let image = safeSocialPreviewUrl(item.image, data.category) ? item.image! : '';
-        if (!image && source === 'instagram') {
+        const path = new URL(item.url).pathname;
+        if (!image && source === 'instagram' && metaBudget > 0 &&
+          /^\/(p|reel|tv)\//.test(path)) {
+          metaBudget--;
           try {
             const meta = await scrapeMeta(item.url);
             if (safeSocialPreviewUrl(meta.image, data.category)) image = meta.image;
-          } catch { /* optional remote preview */ }
+          } catch { /* public post may still embed normally */ }
         }
-        return { title: item.title, source_url: item.url, description: item.description ?? '', image };
-      }));
+        results.push({ title: item.title, source_url: item.url,
+          description: item.description ?? '', image });
+      }
       // Profiles without a preview and non-embeddable links cannot be shown
       // as image cards. Prefer posts/Reels whose media can be embedded.
       const photoResults = results.filter(item => item.image
