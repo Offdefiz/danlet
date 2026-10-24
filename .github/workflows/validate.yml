@@ -47,30 +47,6 @@ jobs:
           fi
       - name: Run automated tests
         run: bun run test
-      - name: Probe keyless Firecrawl search (diagnostic only)
-        if: github.event_name == 'pull_request' && github.head_ref == 'feat/dream-dynamic-keyless-search-20261024'
-        continue-on-error: true
-        run: |
-          node --input-type=module <<'NODE'
-          const r = await fetch('https://api.firecrawl.dev/v2/search', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              query: 'site:instagram.com casamento eventos Tiradentes MG',
-              sources: [{ type: 'web' }, { type: 'images' }],
-              limit: 5,
-            }),
-            signal: AbortSignal.timeout(15000),
-          });
-          const data = await r.json();
-          console.log(JSON.stringify({
-            keylessStatus: r.status,
-            success: data.success,
-            webResults: data.data?.web?.length ?? 0,
-            imageResults: data.data?.images?.length ?? 0,
-            error: data.error?.code ?? (typeof data.error === 'string' ? data.error.slice(0, 120) : null),
-          }));
-          NODE
       - name: Static analysis
         run: "bunx eslint . --rule 'prettier/prettier: off'"
       - name: Type check
