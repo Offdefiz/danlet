@@ -44,7 +44,7 @@ async function storeImage(supabase: SupabaseClient<Database>, userId: string, im
   try {
     const response = await fetch(image, { signal: controller.signal });
     if (!response.ok) return null;
-    const type = (response.headers.get('content-type') ?? '').split(';')[0].trim().toLowerCase();
+    const type = ((response.headers.get('content-type') ?? '').split(';')[0] ?? '').trim().toLowerCase();
     if (!['image/jpeg','image/png','image/webp'].includes(type)) return null;
     const size = Number(response.headers.get('content-length') ?? 0);
     if (size > 6 * 1024 * 1024) return null;
