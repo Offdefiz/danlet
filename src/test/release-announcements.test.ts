@@ -75,7 +75,9 @@ describe('Automated new-version notifications', () => {
     db.pushTo.mockResolvedValue(0);
     expect((await sendReleaseAnnouncements()).sent).toBe(0);
     expect(db.deleteMarker).toHaveBeenCalledTimes(2);
-    expect(db.deleteMarker).toHaveBeenCalledWith('id', 'unique-marker');
+    expect(db.deleteMarker).toHaveBeenNthCalledWith(1, 'id', expect.stringMatching(/^[0-9a-f-]{36}$/));
+    expect(db.deleteMarker).toHaveBeenNthCalledWith(2, 'id', expect.stringMatching(/^[0-9a-f-]{36}$/));
+    expect(db.deleteMarker.mock.calls[0]![1]).not.toBe(db.deleteMarker.mock.calls[1]![1]);
   });
   it('changes the notification copy for later versions, keeping the full details in-app', () => {
     expect(releasePushCopy('2.7.0').body).toContain('Supabase');
