@@ -12,6 +12,16 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.7.0', date: '2026-10-23', title: 'Todas as novidades, sempre pertinho',
+    kind: 'Novidades',
+    highlights: [
+      'Aviso push de nova versão para cada integrante do casal, uma vez por lançamento.',
+      'Janela flutuante automática ao entrar no Duet após uma atualização, com novidades desde a última versão vista.',
+      'Nesta primeira visita, um resumo completo de tudo que chegou depois da migração para o novo Supabase.',
+      'Confirmação individual de leitura e histórico de versões disponível a qualquer momento no perfil, no menu e na tela inicial.',
+    ],
+  },
+  {
     version: '2.6.0', date: '2026-10-23', title: 'Liquid Glass para o seu Duet',
     kind: 'Novidades',
     highlights: [
@@ -73,3 +83,89 @@ export const releaseNotes: readonly ReleaseNote[] = [
   },
 ] as const;
 export const currentVersion = releaseNotes[0]!.version;
+
+
+/** The first-time release tour covers the improvements shipped AFTER moving
+ * Duet's data off the original Lovable-managed Supabase. Later visits show
+ * only release notes newer than the version acknowledged on this device. */
+export const postMigrationHighlights = [
+  {
+    title: 'Juntos e planos compartilhados',
+    items: [
+      '22 ideias de atividades organizadas entre refeições, passeios, casa, bem-estar, organização e tempo a dois.',
+      'Vocês podem criar propostas próprias, com data e horário, como “Guacamole hoje?”.',
+      'Uma proposta só vira compromisso na Agenda e em Planos quando os dois dizem sim.',
+      'Aceites, recusas e confirmações de acordo geram avisos próprios; a resposta do outro nunca é presumida.',
+      'Propostas recusadas ou com data vencida ficam no Histórico, sem poluir o Juntos.',
+      'Botão Reenviar notificação para lembrar quem ainda não respondeu, sem duplicar a proposta.',
+    ],
+  },
+  {
+    title: 'Notificações e lembretes',
+    items: [
+      'Lembretes automáticos variados a cada aproximadamente 20 minutos, inclusive à noite, sem teto diário artificial no app.',
+      'Sugestões do Juntos também chegam por push e abrem a decisão correspondente.',
+      'Mensagens e novas entradas online recebem avisos prioritários, separados dos lembretes automáticos.',
+      'O conteúdo da mensagem e o nome de quem enviou aparecem na prévia da push, conforme as permissões do iPhone.',
+      'Mensagens recebidas com o Duet aberto aparecem em um aviso no topo, com atalho para o chat.',
+      'Sons de clique, navegação, decisões e notificações foram ampliados e ajustados para o Safari.',
+    ],
+  },
+  {
+    title: 'Chat e presença',
+    items: [
+      'Status online/offline atualizado por presença em tempo real com verificação alternativa no servidor.',
+      'O chat mostra quando a outra pessoa esteve online pela última vez.',
+      'A conversa sempre abre na mensagem mais recente, sem abrir o teclado automaticamente.',
+      'A lista de mensagens rola sozinha; a página atrás da janela fica parada.',
+      'Balões, campo de envio e botões ganharam espaçamento e bordas mais arredondadas.',
+    ],
+  },
+  {
+    title: 'Temas e personalização',
+    items: [
+      'Os temas agora ficam divididos em Premium, Elegantes e Simples e são escolhidos individualmente.',
+      'Barbie Glitter com cintilação, e Metallic Purple com roxo cromado e metal líquido.',
+      'Black Diamond e Champagne Gold, com acabamento sofisticado de vidro e metal.',
+      'Aqua Mercury, Opal Holographic e Midnight Stardust, cada um com sua própria animação.',
+      'No total, são 16 opções de tema, com respeito às preferências de reduzir movimentos.',
+    ],
+  },
+  {
+    title: 'Perfil, fotos e navegação',
+    items: [
+      'Nova tela de perfil com foto maior, nome editável e atalhos para preferências.',
+      'Fotos de perfil otimizadas antes do envio, com cache temporário para carregar mais rápido.',
+      'Menu inferior flutuante e translúcido, com seleção animada no estilo liquid glass.',
+      'Tocar novamente na aba atual leva a página ao topo, como nos aplicativos de celular.',
+      'Áreas de toque, encaixe dos botões e espaço seguro do iPhone foram revisados.',
+    ],
+  },
+  {
+    title: 'Novidades do próprio Duet',
+    items: [
+      'Histórico de atualizações acessível pelo menu, perfil e tela inicial.',
+      'Agora cada nova versão pode avisar vocês por push e abrir automaticamente uma janela de novidades.',
+      'As novidades vistas ficam registradas por conta neste aparelho, sem repetir o mesmo aviso de abertura a cada visita.',
+    ],
+  },
+] as const;
+
+export function compareReleaseVersions(a: string, b: string): number {
+  const parse = (value: string) => value.split('.').map(part => /^\d+$/.test(part) ? Number(part) : -1);
+  const left = parse(a), right = parse(b);
+  if (left.length !== 3 || right.length !== 3 || [...left, ...right].some(part => part < 0 || !Number.isFinite(part))) return 0;
+  for (let i = 0; i < 3; i++) {
+    if (left[i]! !== right[i]!) return left[i]! > right[i]! ? 1 : -1;
+  }
+  return 0;
+}
+
+export function newReleaseNotesSince(acknowledgedVersion: string | null): readonly ReleaseNote[] {
+  if (!acknowledgedVersion) return releaseNotes;
+  return releaseNotes.filter(note => compareReleaseVersions(note.version, acknowledgedVersion) > 0);
+}
+
+export function releaseAcknowledgementKey(userId: string): string {
+  return 'duet:updates:last-read:' + userId;
+}
