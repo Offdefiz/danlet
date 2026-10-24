@@ -113,3 +113,24 @@ export function DreamReferencePhoto({
     {!compact && reference.image_credit && <p className="px-2 py-2 text-[11px] text-muted-foreground">{reference.image_credit}</p>}
   </a>;
 }
+
+/** Public original-hosted image, with an official embed if hotlinking fails.
+ * There is always an attribution and a link to the publication. */
+export function DreamSearchPhoto({ image, sourceUrl, category, title }: {
+  image: string; sourceUrl: string; category: string; title: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [image, sourceUrl]);
+  const useImage = !failed && safeSocialPreviewUrl(image, category);
+  return <div className="space-y-1">
+    {useImage
+      ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-[20px] bg-muted">
+          <img src={image} alt={'Foto real da publicação: ' + title} loading="lazy" decoding="async"
+            className="max-h-[360px] w-full object-contain" onError={() => setFailed(true)}/>
+        </a>
+      : <DreamPlatformPreview sourceUrl={sourceUrl} category={category}/>}
+    <p className="text-[11px] text-muted-foreground">
+      Prévia pública de {sourceForCategory(category) === 'instagram' ? 'Instagram' : 'Pinterest'} · <a className="underline" href={sourceUrl} target="_blank" rel="noopener noreferrer">Ver imagem na origem</a>
+    </p>
+  </div>;
+}
