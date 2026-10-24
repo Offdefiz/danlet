@@ -78,6 +78,7 @@ export const importDreamReference = createServerFn({ method: 'POST' })
     title: z.string().min(1).max(160),
     notes: z.string().max(2000).default(''),
     uploaded_path: z.string().max(320).nullable().default(null),
+    preview_url: z.string().url().max(2048).nullable().default(null),
   }))
   .handler(async ({ data, context }) => {
     if (!isDreamSourceUrl(data.source_url, data.category)) {
@@ -87,6 +88,7 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       .select('person').eq('user_id', context.userId).maybeSingle();
     if (!member) throw new Error('Acesso reservado ao casal.');
     let image_path: string | null = null;
+    let image_url: string | null = null;
     let credit = '';
     if (data.uploaded_path) {
       if (!data.uploaded_path.startsWith(context.userId + '/dream-') ||
@@ -101,6 +103,9 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       }
       image_path = data.uploaded_path;
       credit = 'Foto adicionada pelo casal · fonte: ' + sourceForCategory(data.category);
+    } else if (data.preview_url && safeSocialPreviewUrl(data.preview_url, data.category)) {
+      image_url = data.preview_url;
+      credit = 'Prévia pública · ' + sourceForCategory(data.category);
     } else if (sourceForCategory(data.category) === 'instagram') {
       try {
         const meta = await scrapeMeta(data.source_url);
@@ -108,7 +113,7 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       } catch { /* protected or blocked Instagram content */ }
       credit = 'Prévia pública do Instagram · confira a publicação original';
     }
-    if (!image_path) throw new Error(
+    if (!image_path && !image_url) throw new Error(
       sourceForCategory(data.category) === 'pinterest'
         ? 'O Pinterest não liberou uma imagem por integração. Anexe uma foto autorizada para usar esse Pin no Dream Match.'
         : 'O Instagram não liberou uma foto estável. Anexe uma foto autorizada antes de salvar essa opção.',
@@ -122,10 +127,11 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       created_by: context.userId,
       verification: 'Fonte ' + sourceForCategory(data.category) + ' · fotografia vinculada',
       image_path,
+      image_url,
       image_credit: credit,
     });
     if (error) throw new Error('Não foi possível salvar essa referência com fotografia: ' + error.message);
-    return { title: data.title, image_path };
+    return { title: data.title, image_path, image_url };
   });
 
 export const fetchPhoto = createServerFn({ method: 'POST' })
