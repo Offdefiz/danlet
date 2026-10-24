@@ -1,3 +1,4 @@
+import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 /** Dream Match only discovers real Instagram venues and Pinterest decoration.
  * Validated source URL is required; do not accept generic search results or
  * a text-only listing as a swipe card.
@@ -27,10 +28,15 @@ export function pinId(source: string): string | null {
   if (!isDreamSourceUrl(source, 'Decoração')) return null;
   return new URL(source).pathname.match(/^\/pin\/(\d+)/)?.[1] ?? null;
 }
-export function hasDreamPhoto(reference: { image_path: string | null }): boolean {
-  return typeof reference.image_path === 'string' && reference.image_path.trim().length > 0;
+export function hasDreamPhoto(reference: {
+  image_path: string | null; image_url?: string | null; category?: string;
+}): boolean {
+  return Boolean(reference.image_path?.trim())
+    || Boolean(reference.category && safeSocialPreviewUrl(reference.image_url, reference.category));
 }
-export function dreamCollections<T extends { id: string; image_path: string | null }>(
+export function dreamCollections<T extends {
+  id: string; image_path: string | null; image_url?: string | null; category?: string;
+}>(
   refs: T[],
   votes: Array<{ reference_id: string; user_id: string; liked: boolean; super_liked: boolean }>,
   userId: string,
