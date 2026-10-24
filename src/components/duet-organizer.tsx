@@ -571,7 +571,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       <DialogHeader><DialogTitle>Buscar {category === 'Decoração' ? 'no Pinterest' : 'no Instagram'}</DialogTitle></DialogHeader>
       <p className="text-xs text-muted-foreground">
         {category === 'Decoração'
-          ? 'Somente Pins públicos do Pinterest. A foto aparece na prévia oficial; para salvar no baralho, anexe uma imagem permitida.'
+          ? 'Somente Pins públicos do Pinterest. Se a miniatura pública estiver disponível, você já pode salvar. Também pode anexar uma imagem autorizada.'
           : 'Somente perfis e publicações públicas do Instagram. Quando a rede não disponibiliza uma foto para uso no Duet, você pode anexar uma imagem autorizada.'}
       </p>
       <label className="text-sm">Região, estilo ou cidade
@@ -581,6 +581,18 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </label>
       <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
       {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
+      <Button asChild variant="outline" className="w-full rounded-2xl">
+        <a href={category === 'Decoração'
+          ? 'https://www.pinterest.com/search/pins/?q=' + encodeURIComponent(region || 'decoração casamento jardim')
+          : 'https://www.instagram.com/explore/tags/' + encodeURIComponent(
+              (region.trim().split(/[\s,]+/)[0] || 'casamentobh')
+                .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
+            ) + '/'}
+          target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={16}/> Buscar também diretamente no {category === 'Decoração' ? 'Pinterest' : 'Instagram'}
+        </a>
+      </Button>
+
       {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
         <h3 className="text-base font-semibold">{item.title}</h3>
         <DreamSearchPhoto key={item.source_url} category={category}
