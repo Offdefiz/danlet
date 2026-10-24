@@ -326,6 +326,7 @@ export type Database = {
           id: string
           image_credit: string | null
           image_path: string | null
+          image_url: string | null
           instagram_url: string | null
           scenery: string
           source_url: string
@@ -343,6 +344,7 @@ export type Database = {
           id?: string
           image_credit?: string | null
           image_path?: string | null
+          image_url?: string | null
           instagram_url?: string | null
           scenery?: string
           source_url: string
@@ -360,6 +362,7 @@ export type Database = {
           id?: string
           image_credit?: string | null
           image_path?: string | null
+          image_url?: string | null
           instagram_url?: string | null
           scenery?: string
           source_url?: string

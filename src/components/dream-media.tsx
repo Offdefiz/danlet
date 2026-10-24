@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Camera, ExternalLink, Instagram } from 'lucide-react';
+import { Camera, ExternalLink } from 'lucide-react';
 import type { Row } from '@/lib/duet.types';
 import { cachedAvatarUrl } from '@/lib/avatar-images';
-import { pinId, sourceForCategory } from '@/lib/dream-match';
+import { pinId, sourceForCategory, hasDreamPhoto } from '@/lib/dream-match';
+import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 
 /** Only official public Instagram/Pinterest embeds are used as source previews.
  * Pinterest media is not scraped or downloaded. It is imported into swipe
@@ -61,8 +62,8 @@ export function DreamPlatformPreview({ sourceUrl, category }: { sourceUrl: strin
   </div>;
 }
 
-/** Actual saved photo is required by the three Dream Match galleries. When
- * the image cannot load, never replace it with a fake landscape photo. */
+/** Display a real saved photo or verified public social thumbnail. Fall back
+ * to the platform's own embed if a hotlink expires; never fabricate a photo. */
 export function DreamReferencePhoto({
   reference, compact = false, onUnavailable,
 }: { reference: Row<'references_catalog'>; compact?: boolean; onUnavailable?: () => void }) {
@@ -75,13 +76,28 @@ export function DreamReferencePhoto({
     if (reference.image_path) void cachedAvatarUrl(reference.image_path).then(value => {
       if (active) setUrl(value);
     }).catch(() => { if (active) setBroken(true); });
+    else if (safeSocialPreviewUrl(reference.image_url, reference.category)) {
+      setUrl(reference.image_url!);
+    }
     return () => { active = false; };
-  }, [reference.image_path]);
+  }, [reference.image_path, reference.image_url, reference.category]);
 
-  if (broken || !reference.image_path) return <div className={`flex ${compact ? 'h-24' : 'min-h-44'} flex-col items-center justify-center gap-2 rounded-2xl border border-dashed border-border bg-muted/40 p-3 text-center text-sm text-muted-foreground`}>
-    <Camera size={23}/><p>Foto indisponível. Esta referência precisa de imagem para participar.</p>
-    {onUnavailable && <button type="button" className="text-primary underline" onClick={onUnavailable}>Adicionar fotografia</button>}
-  </div>;
+  if (broken || !hasDreamPhoto(reference)) {
+    const path = (() => { try { return new URL(reference.source_url).pathname; } catch { return ''; } })();
+    const embeddable = (reference.category === 'Decoração' && Boolean(pinId(reference.source_url)))
+      || (reference.category !== 'Decoração' && /^\/(p|reel|tv)\//.test(path));
+    return <div className="space-y-2 rounded-2xl border border-border bg-muted/30 p-2">
+      {embeddable ? <DreamPlatformPreview key={reference.source_url} sourceUrl={reference.source_url} category={reference.category}/>
+        : <div className={`flex ${compact ? 'h-24' : 'min-h-44'} items-center justify-center gap-2 text-center text-sm text-muted-foreground`}>
+            <Camera size={20}/> Foto temporariamente indisponível
+          </div>}
+      <div className="flex flex-wrap items-center justify-center gap-2 py-2">
+        {onUnavailable && <button type="button" className="rounded-full border border-border px-3 py-2 text-xs text-primary"
+          onClick={onUnavailable}>Anexar foto</button>}
+        <a href={reference.source_url} target="_blank" rel="noopener noreferrer" className="text-xs text-primary underline">Ver mídia original</a>
+      </div>
+    </div>;
+  }
 
   return <a className="block overflow-hidden rounded-[20px]" href={reference.source_url} target="_blank" rel="noopener noreferrer"
     title={sourceForCategory(reference.category) === 'pinterest' ? 'Ver foto original no Pinterest' : 'Ver foto original no Instagram'}>
@@ -96,4 +112,25 @@ export function DreamReferencePhoto({
     </div>
     {!compact && reference.image_credit && <p className="px-2 py-2 text-[11px] text-muted-foreground">{reference.image_credit}</p>}
   </a>;
+}
+
+/** Public original-hosted image, with an official embed if hotlinking fails.
+ * There is always an attribution and a link to the publication. */
+export function DreamSearchPhoto({ image, sourceUrl, category, title }: {
+  image: string; sourceUrl: string; category: string; title: string;
+}) {
+  const [failed, setFailed] = useState(false);
+  useEffect(() => setFailed(false), [image, sourceUrl]);
+  const useImage = !failed && safeSocialPreviewUrl(image, category);
+  return <div className="space-y-1">
+    {useImage
+      ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-[20px] bg-muted">
+          <img src={image} alt={'Foto real da publicação: ' + title} loading="lazy" decoding="async"
+            className="max-h-[360px] w-full object-contain" onError={() => setFailed(true)}/>
+        </a>
+      : <DreamPlatformPreview sourceUrl={sourceUrl} category={category}/>}
+    <p className="text-[11px] text-muted-foreground">
+      Prévia pública de {sourceForCategory(category) === 'instagram' ? 'Instagram' : 'Pinterest'} · <a className="underline" href={sourceUrl} target="_blank" rel="noopener noreferrer">Ver imagem na origem</a>
+    </p>
+  </div>;
 }
