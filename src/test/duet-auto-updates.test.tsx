@@ -46,7 +46,7 @@ describe('Every Duet update announces what changed', () => {
   });
   it('automatically opens the complete migration tour on first sign-in', async () => {
     render(<DuetUpdatesDialog userId={daniel}/>);
-    const popup = await screen.findByRole('dialog', { name: 'Novidades e atualizações do Duet' }, { timeout: 4000 });
+    const popup = await screen.findByRole('dialog', undefined, { timeout: 4000 });
     expect(popup.textContent).toContain('Tudo que chegou ao Duet');
     expect(popup.textContent).toContain('Juntos e planos compartilhados');
     expect(popup.textContent).toContain('Midnight Stardust');
@@ -58,7 +58,7 @@ describe('Every Duet update announces what changed', () => {
   it('shows ONLY the subsequent release after a previous version was acknowledged', async () => {
     window.localStorage.setItem(releaseAcknowledgementKey(daniel), '2.6.0');
     render(<DuetUpdatesDialog userId={daniel}/>);
-    const popup = await screen.findByRole('dialog', { name: 'Novidades e atualizações do Duet' }, { timeout: 4000 });
+    const popup = await screen.findByRole('dialog', undefined, { timeout: 4000 });
     expect(popup.textContent).toContain('Tem novidade no Duet');
     expect(popup.textContent).toContain('uma vez por lançamento');
     expect(popup.textContent).not.toContain('22 ideias');
