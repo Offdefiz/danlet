@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.6.0', date: '2026-10-23', title: 'Liquid Glass para o seu Duet',
+    kind: 'Novidades',
+    highlights: [
+      'Novo menu inferior flutuante: cápsula translúcida com seleção de vidro líquido que desliza entre telas.',
+      'Ao tocar de novo na aba atual, a página retorna suavemente ao topo, como nos apps para iPhone.',
+      'Abrir o chat não exibe o teclado; ele só aparece quando você toca no campo de mensagem.',
+      'Três novos Premium com efeitos animados: Aqua Mercury, Opal Holographic e Midnight Stardust.',
+      'Ajustes de espaçamento, contraste, segurança de área no iPhone e suporte à opção Reduzir Movimento.',
+    ],
+  },
+  {
     version: '2.5.1', date: '2026-10-23', title: 'Conversa mais fluida',
     kind: 'Melhorias',
     highlights: [
