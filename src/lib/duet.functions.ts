@@ -32,7 +32,12 @@ export const findReferences = createServerFn({ method: 'POST' })
         }
         return { title: item.title, source_url: item.url, description: item.description ?? '', image };
       }));
-      if (results.length) return { results, error: null, mode: 'live' as const };
+      // Profiles without a preview and non-embeddable links cannot be shown
+      // as image cards. Prefer posts/Reels whose media can be embedded.
+      const photoResults = results.filter(item => item.image
+        || /^\/(?:p|reel|tv)\//.test(new URL(item.source_url).pathname)
+        || source === 'pinterest');
+      if (photoResults.length) return { results: photoResults, error: null, mode: 'live' as const };
     } catch { /* public curated references remain available offline */ }
     const curated = curatedDreamResults(data.category, region);
     return {
@@ -140,7 +145,7 @@ export const fetchPhoto = createServerFn({ method: 'POST' })
   .handler(async ({ data, context }) => {
     const { data: ref } = await context.supabase.from('references_catalog').select('*')
       .eq('id', data.id).maybeSingle();
-    if (!ref || ref.image_path || sourceForCategory(ref.category) !== 'instagram') return { ok: false };
+    if (!ref || ref.image_path || ref.image_url || sourceForCategory(ref.category) !== 'instagram') return { ok: false };
     const source = [ref.instagram_url, ref.source_url].find(
       url => url && isDreamSourceUrl(url, ref.category),
     );
