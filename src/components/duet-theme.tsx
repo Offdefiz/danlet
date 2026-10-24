@@ -10,6 +10,9 @@ export const themes = [
   { id: 'metallic-purple', label: 'Metallic Purple', description: 'Lilás cromado e metal líquido', colors: ['#100A23', '#B9A0FA', '#6D3EBF'] },
   { id: 'black-diamond', label: 'Black Diamond', description: 'Obsidiana, prata e reflexos de diamante', colors: ['#080C17', '#99A9CE', '#3D4771'] },
   { id: 'champagne-gold', label: 'Champagne Gold', description: 'Champanhe acetinado e ouro líquido', colors: ['#F9F1E5', '#B78B4D', '#E7CDA4'] },
+  { id: 'aqua-mercury', label: 'Aqua Mercury', description: 'Cromo líquido, água e luz esmeralda', colors: ['#071C25', '#52E1D4', '#247E91'] },
+  { id: 'opal-holographic', label: 'Opal Holographic', description: 'Opala iridescente com arco-íris acetinado', colors: ['#F9F7FC', '#B49BE2', '#8BCFC9'] },
+  { id: 'midnight-stardust', label: 'Midnight Stardust', description: 'Céu de safira com estrelas que cintilam', colors: ['#070C26', '#A4A8FC', '#3F62A8'] },
   { id: 'dark-elegant', label: 'Escuro Elegante', description: 'Noturno e sofisticado', colors: ['#171719', '#C5849A', '#E8D9C8'] },
   { id: 'clean-luxe', label: 'Clean Luxo', description: 'Minimalista refinado', colors: ['#F9F7F3', '#262626', '#CBB8A0'] },
   { id: 'pastel-romantic', label: 'Pastel Romântico', description: 'Lavanda e rosa suave', colors: ['#FCF6FC', '#9A82BB', '#E6A3C1'] },
@@ -22,12 +25,21 @@ export const themes = [
 ] as const;
 
 export const themeGroups = [
-  { id: 'premium', label: 'Premium', description: 'Acabamentos especiais, vidro e reflexos', themeIds: ['pink-glitter', 'metallic-purple', 'black-diamond', 'champagne-gold'] },
+  { id: 'premium', label: 'Premium', description: 'Acabamentos especiais, vidro e reflexos', themeIds: ['pink-glitter', 'metallic-purple', 'aqua-mercury', 'opal-holographic', 'midnight-stardust', 'black-diamond', 'champagne-gold'] },
   { id: 'elegant', label: 'Elegantes', description: 'Sofisticados para o dia a dia', themeIds: ['dark-elegant', 'clean-luxe', 'pastel-romantic', 'earthy'] },
   { id: 'simple', label: 'Simples', description: 'Paletas leves e originais', themeIds: ['clean-modern', 'romance', 'sage', 'rose', 'ocean'] },
 ] as const;
 
 type ThemeId = (typeof themes)[number]['id'];
+const premiumPreviews: Partial<Record<ThemeId, string>> = {
+  'metallic-purple': 'duet-liquid-purple-preview',
+  'aqua-mercury': 'duet-aqua-mercury-preview',
+  'opal-holographic': 'duet-opal-holographic-preview',
+  'midnight-stardust': 'duet-midnight-stardust-preview',
+  'black-diamond': 'duet-black-diamond-preview',
+  'champagne-gold': 'duet-champagne-preview',
+};
+
 const DEFAULT_THEME: ThemeId = 'romance';
 const STORAGE_PREFIX = 'duet:personal-theme:';
 
@@ -103,8 +115,8 @@ export function ThemePicker({ userId, hideTrigger = false }: { userId: string; h
             className={`flex min-h-[76px] items-center gap-3 rounded-2xl border p-3 text-left transition-colors ${selected === item.id ? 'border-primary bg-secondary ring-1 ring-primary' : 'border-border bg-card hover:bg-muted'}`}>
             {item.id === 'pink-glitter'
               ? <span className="duet-glitter-preview flex h-12 w-[76px] shrink-0 items-center justify-center rounded-xl border border-[#E5A4BF]" aria-hidden="true"><span className="relative z-[1] text-xl text-white">♡</span></span>
-              : ['metallic-purple','black-diamond','champagne-gold'].includes(item.id)
-                ? <span className={`flex h-12 w-[76px] shrink-0 items-center justify-center rounded-xl ${item.id === 'metallic-purple' ? 'duet-liquid-purple-preview' : item.id === 'black-diamond' ? 'duet-black-diamond-preview' : 'duet-champagne-preview'}`} aria-hidden="true"><span className="relative z-[1] text-xl text-white drop-shadow-md">♡</span></span>
+              : premiumPreviews[item.id]
+                ? <span className={`flex h-12 w-[76px] shrink-0 items-center justify-center rounded-xl ${premiumPreviews[item.id]}`} aria-hidden="true"><span className="relative z-[1] text-xl text-white drop-shadow-md">♡</span></span>
                 : <span className="flex shrink-0 -space-x-2" aria-hidden="true">{item.colors.map((color,i) => <span key={i} className="h-8 w-8 rounded-full border border-black/10" style={{ backgroundColor: color }}/>)}</span>}
             <span className="min-w-0 flex-1"><span className="block text-sm font-semibold">{item.label}</span><span className="block text-xs text-muted-foreground">{item.description}</span></span>
             {selected === item.id && <Check size={17} className="shrink-0 text-primary"/>}

@@ -683,3 +683,401 @@ body:has(.duet-chat-dialog[data-state="open"]) {
     width: min(100%, calc(100vw - 24px));
   }
 }
+
+
+/* Duet native-style floating glass dock, influenced by public React/iOS tab bar
+   explorations. All glass runs as CSS so it remains usable in iPhone Safari. */
+.duet-floating-nav {
+  pointer-events: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.duet-nav-shell {
+  pointer-events: auto;
+  isolation: isolate;
+  position: relative;
+  min-height: 73px;
+  border-radius: 32px;
+  background: color-mix(in srgb, var(--card) 72%, transparent);
+  border: 1px solid color-mix(in srgb, var(--foreground) 14%, #ffffffa8 86%);
+  box-shadow:
+    0 17px 45px #0c091b35,
+    0 4px 14px #0c091b18,
+    inset 0 1.5px 0 #ffffff82,
+    inset 0 -1px 0 #ffffff24;
+  backdrop-filter: blur(28px) saturate(180%);
+  -webkit-backdrop-filter: blur(28px) saturate(180%);
+}
+.duet-nav-shell::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(160deg, #ffffff4a 0%, #ffffff12 32%, transparent 60%, #ffffff12 100%);
+}
+.duet-nav-item {
+  z-index: 1;
+  min-height: 60px;
+  outline-offset: 3px;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+.duet-nav-item:focus-visible { outline: 2px solid var(--ring); }
+.duet-nav-selection {
+  background:
+    radial-gradient(ellipse 85% 65% at 48% -6%, #ffffffa0, transparent 70%),
+    linear-gradient(133deg,
+      color-mix(in srgb, var(--primary) 27%, var(--card)) 0%,
+      color-mix(in srgb, var(--card) 69%, #ffffff42) 42%,
+      color-mix(in srgb, var(--primary) 18%, var(--card)) 100%);
+  border: 1px solid color-mix(in srgb, var(--foreground) 13%, #ffffffa6);
+  box-shadow:
+    inset 0 1px 1px #ffffffaa,
+    inset 0 -1px 1px #ffffff24,
+    0 4px 14px #15102222;
+  backdrop-filter: blur(14px) saturate(175%);
+  -webkit-backdrop-filter: blur(14px) saturate(175%);
+}
+.duet-nav-selection::after {
+  content: "";
+  position: absolute;
+  inset: 2px;
+  border-radius: inherit;
+  pointer-events: none;
+  background: linear-gradient(145deg, #ffffff59, transparent 41%, #ffffff18 100%);
+}
+[data-theme="metallic-purple"] .duet-nav-shell,
+[data-theme="aqua-mercury"] .duet-nav-shell,
+[data-theme="midnight-stardust"] .duet-nav-shell,
+[data-theme="black-diamond"] .duet-nav-shell {
+  border-color: #ffffff5a;
+  box-shadow: 0 18px 43px #05020cb0, inset 0 1px #ffffff64, inset 0 -1px #ffffff12;
+}
+[data-theme="metallic-purple"] .duet-nav-selection,
+[data-theme="aqua-mercury"] .duet-nav-selection,
+[data-theme="midnight-stardust"] .duet-nav-selection,
+[data-theme="black-diamond"] .duet-nav-selection {
+  box-shadow: inset 0 1px #ffffff72, 0 4px 13px #02020857;
+}
+@supports not (backdrop-filter: blur(2px)) {
+  .duet-nav-shell { background: var(--card); }
+  .duet-nav-selection { background: var(--secondary); }
+}
+@media (prefers-contrast: more), (prefers-reduced-transparency: reduce) {
+  .duet-nav-shell {
+    background: var(--card);
+    border: 2px solid var(--border);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+  .duet-nav-selection {
+    background: var(--secondary);
+    border: 2px solid var(--primary);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
+@media (max-width: 350px) {
+  .duet-nav-shell { padding: 4px; }
+  .duet-nav-item { padding-inline: 0; }
+  .duet-nav-item > span:last-child { font-size: 10px; }
+}
+
+/* Premium 05 — Aqua Mercury: animated liquid metal / deep emerald water. */
+@layer base {
+  [data-theme="aqua-mercury"] {
+    color-scheme: dark;
+    --background: #061921; --foreground: #F0FFFC;
+    --card: #132D39; --card-foreground: #F0FFFC;
+    --popover: #173341; --popover-foreground: #F0FFFC;
+    --primary: #78EEE1; --primary-foreground: #06272A;
+    --secondary: #214653; --secondary-foreground: #EDFFFD;
+    --muted: #21404A; --muted-foreground: #B5DDE0;
+    --accent: #307E83; --accent-foreground: #FFFFFF;
+    --border: #618F99; --input: #638F99; --ring: #A8FFF4;
+    --success: #B3EFA3; --success-foreground: #10311E;
+    --subtle: #B6DAD9; --danger: #FFA0AE;
+    --destructive: #FFA0AE; --destructive-foreground: #351421;
+    --warning: #FBD18A; --warning-foreground: #33230D;
+  }
+  [data-theme="aqua-mercury"] body {
+    background-color: #061921;
+    background-image:
+      radial-gradient(ellipse 58% 52% at 14% 18%, #79EADD8D, #1878837A 42%, transparent 79%),
+      radial-gradient(ellipse 53% 64% at 83% 76%, #21A3B888, #07384A6E 51%, transparent 78%),
+      linear-gradient(125deg, #04131A 8%, #133E47 37%, #061D2A 69%, #0B4B4A 100%);
+    background-size: 155% 150%, 165% 150%, 100% 100%;
+    animation: duet-aqua-current 24s ease-in-out infinite alternate;
+  }
+  [data-theme="aqua-mercury"] body::before {
+    content: "";
+    position: fixed;
+    inset: -8%;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .4;
+    background: conic-gradient(from 190deg at 46% 41%, transparent 0deg, #E0FFF25A 47deg,
+      transparent 90deg, #76F8EF4A 148deg, transparent 196deg, #D5FFFF6D 260deg, transparent 320deg);
+    filter: blur(29px);
+    animation: duet-aqua-metal-shift 23s ease-in-out infinite alternate;
+  }
+}
+[data-theme="aqua-mercury"] .glass-panel,
+[data-theme="aqua-mercury"] header.app-shell {
+  background: linear-gradient(145deg, #D0FFFF25, #123E48D6 31%, #091F30E8 79%, #70D9D328);
+  border: 1px solid #9CE8E08C;
+  box-shadow: inset 0 1px #EDFFFF87, 0 15px 32px #02121977;
+  backdrop-filter: blur(24px) saturate(170%);
+}
+[data-theme="aqua-mercury"] .bg-card {
+  background: linear-gradient(150deg, #20535BCF, #0D2534F2 64%, #1A434CE5);
+  box-shadow: inset 0 1px #C5FFF143;
+}
+[data-theme="aqua-mercury"] .bg-primary {
+  background: linear-gradient(118deg, #E5FFFF, #57B8B9 24%, #90FFF0 48%, #318D9C 68%, #B7FFF1);
+  color: #06272A;
+  box-shadow: inset 0 1px #FFFFFFC9, 0 7px 18px #12E7D04D;
+}
+.duet-aqua-mercury-preview {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #A2FFF3A1;
+  background:
+    radial-gradient(ellipse at 25% 15%, #E9FFFF, #7BEADE 26%, transparent 57%),
+    radial-gradient(ellipse at 72% 70%, #2DDEE0, #074552 58%, transparent 78%),
+    linear-gradient(115deg, #082932, #1B8387 46%, #03232B);
+  box-shadow: inset 0 1px #FFFFFF8C, 0 5px 11px #073E4780;
+}
+.duet-aqua-mercury-preview::after {
+  content: "";
+  position: absolute;
+  inset: -45%;
+  background: conic-gradient(transparent 13%, #E0FFF9A8 37%, transparent 48%, #0A576377 67%, transparent 86%);
+  filter: blur(8px);
+  pointer-events: none;
+  animation: duet-liquid-preview-current 6s ease-in-out infinite alternate;
+}
+
+/* Premium 06 — Opal Holographic: flowing translucent pearl and spectrum. */
+@layer base {
+  [data-theme="opal-holographic"] {
+    color-scheme: light;
+    --background: #F6F4FD; --foreground: #2E2A47;
+    --card: #FDFBFF; --card-foreground: #2E2A47;
+    --popover: #FCFAFF; --popover-foreground: #2E2A47;
+    --primary: #6A4DB4; --primary-foreground: #FFFFFF;
+    --secondary: #E5DCF5; --secondary-foreground: #3C3562;
+    --muted: #EEEAF7; --muted-foreground: #665B86;
+    --accent: #CDB9EF; --accent-foreground: #2F284B;
+    --border: #B1A3D0; --input: #A79AC5; --ring: #7051AD;
+    --success: #357D71; --success-foreground: #FFFFFF;
+    --subtle: #6D6389; --danger: #B44E7A;
+    --destructive: #B44E7A; --destructive-foreground: #FFFFFF;
+    --warning: #9C6924; --warning-foreground: #FFFFFF;
+  }
+  [data-theme="opal-holographic"] body {
+    background-color: #F6F4FD;
+    background-image:
+      radial-gradient(ellipse 66% 57% at 11% 22%, #F5BFE3BF, transparent 74%),
+      radial-gradient(ellipse 68% 51% at 88% 65%, #A0E1DBB6, transparent 77%),
+      radial-gradient(ellipse 48% 70% at 59% 6%, #BDB7F0C4, transparent 78%),
+      linear-gradient(132deg, #FFF9FC, #E7E4F7 46%, #F5F2FD 80%, #FFF9EF);
+    background-size: 130% 135%, 140% 135%, 140% 150%, 100% 100%;
+    animation: duet-opal-spectrum-drift 25s ease-in-out infinite alternate;
+  }
+  [data-theme="opal-holographic"] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .18;
+    background: conic-gradient(from 175deg at 50% 55%,
+      #A8F0E9, #CBB9F4, #FFC5DA, #FBE5B2, #B1F0E7, #CBB9F4);
+    background-size: 135% 135%;
+    mix-blend-mode: multiply;
+    filter: blur(27px);
+    animation: duet-opal-spectrum-drift 26s ease-in-out infinite alternate;
+  }
+}
+[data-theme="opal-holographic"] .glass-panel,
+[data-theme="opal-holographic"] header.app-shell {
+  background: linear-gradient(150deg, #FFFFFFF2 0%, #E4DDF2D9 32%, #F7F6FDEB 67%, #C5EAED9F 100%);
+  border: 1px solid #FFFFFFE8;
+  box-shadow: inset 0 1px #FFFFFF, inset 1px 0 #FFFFFFB0, 0 13px 27px #6F549528;
+  backdrop-filter: blur(23px) saturate(150%);
+}
+[data-theme="opal-holographic"] .bg-card {
+  background: linear-gradient(145deg, #FFFFFFF2, #EDE8F7E6 63%, #E3F5F2DD);
+  box-shadow: inset 0 1px #FFFFFFF1, 0 8px 22px #654F7821;
+}
+[data-theme="opal-holographic"] .bg-primary {
+  background: linear-gradient(130deg, #7350B4, #A163B8 28%, #4E99A1 56%, #7955B3 83%, #6C4AAF);
+  color: white;
+  box-shadow: inset 0 1px #FFFFFF6B, 0 6px 14px #7054A74B;
+}
+.duet-opal-holographic-preview {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #DBCEFE;
+  background:
+    radial-gradient(ellipse at 20% 20%, #FFFFFF, #EBBDE1 35%, transparent 67%),
+    radial-gradient(ellipse at 77% 85%, #79DAD0, #A1A1E7 50%, transparent 75%),
+    linear-gradient(125deg, #FFF4F5, #C9B5EA 56%, #C8F4E9);
+  box-shadow: inset 0 1px #FFFFFF, 0 4px 10px #7550A64F;
+}
+.duet-opal-holographic-preview::after {
+  content: "";
+  position: absolute;
+  inset: -35%;
+  background: conic-gradient(#D5FFFF00, #FFFFFFC9, #FFE7F18C, #99FFFFAA, #C6ADFF92, transparent);
+  mix-blend-mode: screen;
+  filter: blur(9px);
+  pointer-events: none;
+  animation: duet-liquid-preview-current 7s ease-in-out infinite alternate-reverse;
+}
+
+/* Premium 07 — Midnight Stardust: shimmering points over liquid sapphire. */
+@layer base {
+  [data-theme="midnight-stardust"] {
+    color-scheme: dark;
+    --background: #080D27; --foreground: #F7F6FF;
+    --card: #172144; --card-foreground: #F7F6FF;
+    --popover: #192446; --popover-foreground: #F7F6FF;
+    --primary: #B5BDFF; --primary-foreground: #141A43;
+    --secondary: #303A66; --secondary-foreground: #F6F6FF;
+    --muted: #28325B; --muted-foreground: #C8CCEB;
+    --accent: #56599D; --accent-foreground: #FFFFFF;
+    --border: #737AA7; --input: #858DB8; --ring: #D4DAFF;
+    --success: #9BDCC1; --success-foreground: #153A2A;
+    --subtle: #C9CCDF; --danger: #FFA1C0;
+    --destructive: #FFA1C0; --destructive-foreground: #34172A;
+    --warning: #F9D69D; --warning-foreground: #35240D;
+  }
+  [data-theme="midnight-stardust"] body {
+    background-color: #080D27;
+    background-image:
+      radial-gradient(ellipse 68% 66% at 78% 18%, #4854B67D, transparent 73%),
+      radial-gradient(ellipse 69% 60% at 13% 83%, #743F9A6F, transparent 73%),
+      linear-gradient(142deg, #05091B, #1B2353 45%, #080D24 71%, #242051);
+  }
+  [data-theme="midnight-stardust"] body::before {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .54;
+    background:
+      radial-gradient(circle at 13% 20%, #ffffff 0 1px, transparent 2.8px),
+      radial-gradient(circle at 74% 12%, #e1e4ff 0 1.5px, transparent 3.3px),
+      radial-gradient(circle at 38% 43%, #ffffff 0 1px, transparent 2.8px),
+      radial-gradient(circle at 82% 71%, #d8dcff 0 1.4px, transparent 3px),
+      radial-gradient(circle at 24% 84%, #ffffff 0 1.2px, transparent 3px),
+      radial-gradient(circle at 65% 93%, #e2ebff 0 1.5px, transparent 3px);
+    background-size: 340px 390px, 460px 420px, 510px 530px, 395px 510px, 420px 475px, 520px 540px;
+    animation: duet-star-shimmer 5.8s ease-in-out infinite alternate;
+  }
+  [data-theme="midnight-stardust"] body::after {
+    content: "";
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+    opacity: .28;
+    background: radial-gradient(ellipse 55% 35% at 58% 33%, #A5A4FEA3, transparent 75%),
+      radial-gradient(ellipse 40% 33% at 33% 82%, #8A6AB69C, transparent 76%);
+    background-size: 150% 150%;
+    animation: duet-nebula-drift 27s ease-in-out infinite alternate;
+  }
+}
+[data-theme="midnight-stardust"] .glass-panel,
+[data-theme="midnight-stardust"] header.app-shell {
+  background: linear-gradient(145deg, #B2BEF62D, #1B2751DF 31%, #111A3ADD 73%, #9C9DE02C);
+  border: 1px solid #A3AFF28E;
+  box-shadow: inset 0 1px #E5EBFF83, 0 14px 30px #0407199B;
+  backdrop-filter: blur(23px) saturate(165%);
+}
+[data-theme="midnight-stardust"] .bg-card {
+  background: linear-gradient(144deg, #273162E8, #121936EE 75%, #35316ACB);
+  box-shadow: inset 0 1px #C5C6FF38;
+}
+[data-theme="midnight-stardust"] .bg-primary {
+  background: linear-gradient(122deg, #F7F5FF, #949FEE 25%, #E0D5FF 54%, #8A8BC4 74%, #E7E9FF);
+  color: #141A43;
+  box-shadow: inset 0 1px #FFFFFFC9, 0 7px 16px #9E9EFF65;
+}
+.duet-midnight-stardust-preview {
+  isolation: isolate;
+  position: relative;
+  overflow: hidden;
+  border: 1px solid #C0C3F8;
+  background:
+    radial-gradient(ellipse at 70% 20%, #9C9EDB, #3A3D90 39%, transparent 73%),
+    linear-gradient(124deg, #070C24, #26346B 56%, #100B30);
+  box-shadow: inset 0 1px #FFFFFF78, 0 4px 11px #08092EAA;
+}
+.duet-midnight-stardust-preview::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(circle at 12% 21%, #ffffff 0 1px, transparent 3px),
+    radial-gradient(circle at 81% 68%, #ffffff 0 1.4px, transparent 3px),
+    radial-gradient(circle at 67% 17%, #e4eaff 0 1px, transparent 3px),
+    radial-gradient(circle at 35% 78%, #d5dcff 0 1px, transparent 3px);
+  animation: duet-star-shimmer 3.3s ease-in-out infinite alternate;
+}
+@keyframes duet-aqua-current {
+  0% { background-position: 0% 15%, 100% 80%, center; }
+  50% { background-position: 44% 42%, 52% 50%, center; }
+  100% { background-position: 98% 70%, 0% 20%, center; }
+}
+@keyframes duet-aqua-metal-shift {
+  0% { transform: translate3d(-3%, 2%, 0) rotate(-8deg); }
+  100% { transform: translate3d(3%, -4%, 0) rotate(8deg); }
+}
+@keyframes duet-liquid-preview-current {
+  0% { transform: translate3d(-14%, 8%, 0) rotate(-22deg); opacity: .48; }
+  100% { transform: translate3d(12%, -8%, 0) rotate(23deg); opacity: .82; }
+}
+@keyframes duet-opal-spectrum-drift {
+  0% { background-position: 0% 14%, 100% 74%, 30% 0%, center; }
+  55% { background-position: 62% 51%, 28% 26%, 79% 55%, center; }
+  100% { background-position: 100% 82%, 0% 4%, 10% 98%, center; }
+}
+@keyframes duet-star-shimmer {
+  0% { opacity: .22; }
+  54% { opacity: .77; }
+  100% { opacity: .38; }
+}
+@keyframes duet-nebula-drift {
+  0% { background-position: 0% 18%, 77% 60%; }
+  100% { background-position: 98% 82%, 10% 0%; }
+}
+@media (prefers-reduced-motion: reduce) {
+  [data-theme="aqua-mercury"] body,
+  [data-theme="aqua-mercury"] body::before,
+  [data-theme="opal-holographic"] body,
+  [data-theme="opal-holographic"] body::before,
+  [data-theme="midnight-stardust"] body::before,
+  [data-theme="midnight-stardust"] body::after,
+  .duet-aqua-mercury-preview::after,
+  .duet-opal-holographic-preview::after,
+  .duet-midnight-stardust-preview::after {
+    animation: none !important;
+  }
+}
+@media (prefers-contrast: more) {
+  [data-theme="aqua-mercury"] .glass-panel,
+  [data-theme="opal-holographic"] .glass-panel,
+  [data-theme="midnight-stardust"] .glass-panel {
+    background: var(--card);
+    border: 2px solid var(--foreground);
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}

@@ -14,12 +14,12 @@ describe('Duet permanent update history', () => {
   });
   it('includes Barbie, Metallic Purple, Black Diamond and Champagne Gold', () => {
     const body = releaseNotes.flatMap(n => n.highlights).join(' ');
-    for (const label of ['Barbie', 'Metallic Purple', 'Black Diamond', 'Champagne Gold']) {
+    for (const label of ['Barbie', 'Metallic Purple', 'Black Diamond', 'Champagne Gold', 'Aqua Mercury', 'Opal Holographic', 'Midnight Stardust']) {
       expect(body).toContain(label);
     }
     expect(themeGroups[0]?.label).toBe('Premium');
-    expect(themeGroups[0]?.themeIds).toHaveLength(4);
-    expect(themes).toHaveLength(13);
+    expect(themeGroups[0]?.themeIds).toHaveLength(7);
+    expect(themes).toHaveLength(16);
   });
   it('uses minimum mobile touch sizes and accommodates reduced motion', () => {
     const css = readFileSync('src/styles.css', 'utf8');

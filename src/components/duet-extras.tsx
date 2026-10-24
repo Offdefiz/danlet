@@ -120,7 +120,12 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
       <span className={`absolute right-1 top-1 h-2.5 w-2.5 rounded-full border-2 border-background ${online ? 'bg-success' : checking ? 'bg-amber-400' : 'bg-muted-foreground/40'}`}/>
     </Button>
     <Dialog open={open} onOpenChange={next => { if (next) followBottom.current = true; setOpen(next); }}>
-      <DialogContent aria-label="Conversa do casal"
+      <DialogContent aria-label="Conversa do casal" onOpenAutoFocus={event => {
+        // Radix would otherwise focus the message input and open the iPhone keyboard.
+        // Focus the read-only conversation without scrolling or invoking the keyboard.
+        event.preventDefault();
+        messagesRef.current?.focus({ preventScroll: true });
+      }}
         className="duet-chat-dialog flex h-[min(88dvh,790px)] max-h-[calc(100dvh-16px)] w-[calc(100vw-16px)] max-w-xl min-h-0 flex-col gap-0 overflow-hidden rounded-[28px] border-border bg-background p-0 shadow-2xl sm:h-[min(82dvh,790px)] sm:rounded-[30px]">
         <DialogHeader className="shrink-0 border-b border-border bg-card/90 px-4 py-4 pr-16 text-left sm:px-6 sm:pr-16">
           <DialogTitle className="flex min-w-0 items-center gap-3">
@@ -135,7 +140,7 @@ export function Chat({ userId, partnerId, me, partner, messages, profiles }: { u
             </span>
           </DialogTitle>
         </DialogHeader>
-        <div ref={messagesRef} role="log" aria-label="Mensagens do casal" aria-live="polite"
+        <div ref={messagesRef} tabIndex={-1} role="log" aria-label="Mensagens do casal" aria-live="polite"
           onScroll={event => {
             const el = event.currentTarget;
             followBottom.current = chatIsNearBottom(el);

@@ -25,6 +25,7 @@ import { playDuetSound } from '@/lib/duet-sounds';
 import { DuetHighlights } from '@/components/duet-highlights';
 import { DuetQuestions } from '@/components/duet-questions';
 import { DuetWelcome } from '@/components/duet-welcome';
+import { DuetBottomNavigation } from '@/components/duet-bottom-navigation';
 import { parseQuestionLink } from '@/lib/weekend-prompts';
 import { parseProposalLink } from '@/lib/juntos-suggestions';
 
@@ -219,7 +220,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const weddingDate = data.records.find(r => r.kind === 'setting' && r.title === 'Data do casamento');
   const days = weddingDate?.body && !Number.isNaN(Date.parse(weddingDate.body)) ? Math.max(0, Math.ceil((Date.parse(`${weddingDate.body}T12:00:00`) - Date.now()) / 86400000)) : null;
   const recordsList = (items: Row<'records'>[], taskMode = false) => <div className="space-y-3">{items.map(r => <article key={r.id} className="flex items-start gap-3 rounded-lg border border-border bg-card p-4">{taskMode && <Button size="icon" variant={r.done ? 'success' : 'outline'} aria-label={`${r.done ? 'Desmarcar' : 'Concluir'} ${r.title}`} disabled={busy} onClick={() => void mutate(() => supabase.from('records').update({ done: !r.done, updated_by: userId }).eq('id', r.id).eq('version', r.version))}>{r.done && <Check/>}</Button>}<div className="min-w-0 flex-1"><h3 className={`font-medium ${r.done ? 'line-through text-muted-foreground' : ''}`}>{r.title}</h3>{r.body && <p className="mt-1 whitespace-pre-wrap text-sm text-muted-foreground">{r.body}</p>}<p className="mt-2 text-[11px] text-muted-foreground">{data.members.find(m => m.user_id === r.updated_by)?.person ?? 'Nós'} · {dateLabel(r.updated_at)}</p></div><Button size="icon" variant="ghost" title="Editar" aria-label={`Editar ${r.title}`} onClick={() => edit(r)}><Pencil size={14}/></Button><Button size="icon" variant="ghost" title="Excluir" aria-label={`Excluir ${r.title}`} disabled={busy} onClick={() => remove(r)}><Trash2 size={14}/></Button></article>)}</div>;
-  return <div className="min-h-screen bg-background pb-32">
+  return <div className="min-h-screen bg-background pb-[calc(118px+env(safe-area-inset-bottom,0px))]">
     <DuetWelcome userId={userId}/>
     <DuetUpdatesDialog/>
     <header className="app-shell flex min-h-20 items-center justify-between gap-2 border-b border-border py-3">
@@ -310,11 +311,11 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       const signatures = data.signatures.filter(s => s.record_id === g.id); const signed = signatures.some(s => s.user_id === userId);
       return <article key={g.id} className="rounded-lg border border-border bg-card p-5"><div className="flex justify-between"><span className="text-xs text-success">{signatures.length === 2 ? 'Concluída pelos dois' : g.period}</span><div className="flex"><Button variant="ghost" size="icon" aria-label={`Editar ${g.title}`} onClick={() => edit(g)}><Pencil/></Button><Button variant="ghost" size="icon" aria-label={`Excluir ${g.title}`} onClick={() => remove(g)}><Trash2/></Button></div></div><h2 className="mt-3 text-lg font-semibold">{g.title}</h2><p className="mt-2 whitespace-pre-wrap text-sm text-muted-foreground">{g.body}</p><div className="mt-5 flex flex-wrap gap-2 text-xs">{data.members.map(m => <span key={m.user_id} className="flex items-center gap-1 text-muted-foreground">{signatures.some(s => s.user_id === m.user_id) ? <CheckCheck size={13} className="text-success"/> : <Clock size={13}/>} {m.person}</span>)}</div><Button disabled={busy || signed || signatures.length === 2} variant={signatures.length === 2 ? 'success' : 'outline'} className="mt-4 w-full" onClick={() => sign(g)}>{signatures.length === 2 ? 'Meta concluída! ♡' : signed ? `Aguardando ${partnerName}` : 'Assinar conclusão'}</Button></article>;
     })}</div>{!goals.some(g => g.period === period) && <Empty text="Nossos planos começam com uma decisão real." action="Criar uma meta" onClick={() => newRecord('goal')}/>}</div>}
-  </main><nav aria-label="Navegação principal" className="fixed bottom-0 left-0 z-40 w-full border-t border-border bg-popover/95 pb-[env(safe-area-inset-bottom)] shadow-lg backdrop-blur-xl"><div className="mx-auto flex max-w-md items-center justify-between gap-1 px-2 py-2">
-    {([{ id: 'home', label: 'Início', icon: House }, { id: 'dream', label: 'Dream', icon: Heart }, { id: 'together', label: 'Juntos', icon: Flower2 }, { id: 'calendar', label: 'Agenda', icon: CalendarDays }] as const).map(n =>
-      <Button key={n.id} variant="ghost" aria-current={tab === n.id ? 'page' : undefined} onClick={() => { if (n.id === 'together') playDuetSound('question', userId); setTab(n.id); }} className={`h-14 min-w-0 flex-1 flex-col gap-1 rounded-xl px-1 text-[11px] transition-colors ${tab === n.id ? 'bg-secondary text-primary font-semibold' : 'text-muted-foreground hover:text-foreground'}`}><n.icon size={20}/>{n.label}</Button>)}
-    <Button variant="ghost" aria-label="Mais opções e adicionar" onClick={() => setMoreOpen(true)} className={`h-14 min-w-0 flex-1 flex-col gap-1 rounded-xl px-1 text-[11px] ${tab === 'plans' || tab === 'list' || tab === 'profile' ? 'bg-secondary text-primary font-semibold' : 'text-muted-foreground'}`}><Plus size={21}/>Mais</Button>
-    </div></nav>
+  </main>
+  <DuetBottomNavigation active={tab} onNavigate={target => {
+    if (target === 'together') playDuetSound('question', userId);
+    setTab(target);
+  }} onMore={() => setMoreOpen(true)}/>
   <Dialog open={moreOpen} onOpenChange={setMoreOpen}><DialogContent><DialogHeader><DialogTitle>Mais opções</DialogTitle></DialogHeader><div className="grid gap-2">
     <Button variant="outline" onClick={() => {setTab('plans');setMoreOpen(false);}}><ListChecks size={18}/> Planos e metas</Button>
     <Button variant="outline" onClick={() => {setTab('list');setMoreOpen(false);}}><BookHeart size={18}/> Lista e anotações</Button>
