@@ -16,6 +16,7 @@ import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.fun
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
 import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
+import { socialImageSearchUrl, socialSearchSource, needsLiveSearchConfig } from '@/lib/dream-anywhere';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -56,6 +57,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [results, setResults] = useState<SearchItem[]>([]);
   const [region, setRegion] = useState('');
   const [searchError, setSearchError] = useState('');
+  const [dreamSearchMode, setDreamSearchMode] = useState<'live' | 'curated' | 'unavailable' | null>(null);
   const [addReference, setAddReference] = useState(false);
   const [quickAddOpen, setQuickAddOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -170,10 +172,16 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     await mutate(() => supabase.from('records').insert({ kind: 'goal', title: ref.title, body: ref.description, reference_id: ref.id, created_by: userId, updated_by: userId, period: 'Médio Prazo' }));
   }
   async function runSearch() {
-    setBusy(true); setSearchError(''); setResults([]);
-    try { const found = await search({ data: { category, region } }); setResults(found.results); setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma fonte encontrada nesta busca.')); }
-    catch (err) { setSearchError(err instanceof Error ? err.message : 'Não foi possível pesquisar.'); }
-    finally { setBusy(false); }
+    setBusy(true); setSearchError(''); setDreamSearchMode(null); setResults([]);
+    try {
+      const found = await search({ data: { category, region: region.trim() } });
+      setResults(found.results);
+      setDreamSearchMode(found.mode);
+      setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma foto pública encontrada para essa pesquisa.'));
+    } catch {
+      setDreamSearchMode('unavailable');
+      setSearchError('A pesquisa interna não está disponível agora. Você pode procurar fotos da região e adicioná-las ao Dream Match.');
+    } finally { setBusy(false); }
   }
   async function uploadDreamPhoto(file: File): Promise<string> {
     const prepared = await optimizeDreamPhoto(file);
@@ -574,25 +582,33 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           ? 'Somente Pins públicos do Pinterest. Se a miniatura pública estiver disponível, você já pode salvar. Também pode anexar uma imagem autorizada.'
           : 'Somente perfis e publicações públicas do Instagram. Quando a rede não disponibiliza uma foto para uso no Duet, você pode anexar uma imagem autorizada.'}
       </p>
-      <label className="text-sm">Região, estilo ou cidade
+      <label className="text-sm">{category === 'Decoração' ? 'Estilo, cidade ou tema de decoração' : 'Qualquer cidade, bairro, região ou país'}
         <Input value={region} onChange={e => setRegion(e.target.value)}
           placeholder={category === 'Decoração' ? 'Ex.: jardim inglês, iluminação delicada' : 'Ex.: Tiradentes, MG'}
           className="mt-2" maxLength={100}/>
       </label>
       <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
       {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
+      {needsLiveSearchConfig(dreamSearchMode ?? '', results.length) && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/45 p-4">
+        <p className="text-sm font-semibold">Pesquisar além da lista inicial</p>
+        <p className="text-xs leading-relaxed text-muted-foreground">
+          Para trazer resultados de qualquer lugar diretamente para esta tela, ainda precisamos conectar o serviço de pesquisa do Duet.
+          Enquanto isso, você pode procurar fotos de qualquer cidade filtradas para {socialSearchSource(category)} e salvar as publicações que gostar.
+        </p>
+        <Button asChild className="w-full rounded-2xl">
+          <a href={socialImageSearchUrl(category, region)} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={17}/> Ver fotos de {region.trim() || 'outras regiões'}
+          </a>
+        </Button>
+        <Button variant="outline" className="w-full rounded-2xl" onClick={() => { setSearchOpen(false); setAddReference(true); }}>
+          <Plus size={17}/> Adicionar publicação encontrada
+        </Button>
+      </div>}
       <Button asChild variant="outline" className="w-full rounded-2xl">
-        <a href={category === 'Decoração'
-          ? 'https://www.pinterest.com/search/pins/?q=' + encodeURIComponent(region || 'decoração casamento jardim')
-          : 'https://www.instagram.com/explore/tags/' + encodeURIComponent(
-              (region.trim().split(/[\s,]+/)[0] || 'casamentobh')
-                .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase(),
-            ) + '/'}
-          target="_blank" rel="noopener noreferrer">
-          <ExternalLink size={16}/> Buscar também diretamente no {category === 'Decoração' ? 'Pinterest' : 'Instagram'}
+        <a href={socialImageSearchUrl(category, region)} target="_blank" rel="noopener noreferrer">
+          <ExternalLink size={16}/> Buscar fotos do {socialSearchSource(category)} em qualquer lugar
         </a>
       </Button>
-
       {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
         <h3 className="text-base font-semibold">{item.title}</h3>
         <DreamSearchPhoto key={item.source_url} category={category}

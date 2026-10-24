@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.2', date: '2026-10-24', title: 'Buscar inspirações em qualquer lugar',
+    kind: 'Melhorias',
+    highlights: [
+      'A pesquisa do Dream Match aceita o nome completo de qualquer cidade, bairro, região ou país.',
+      'Acesso à busca de imagens do Instagram filtradas para cada região e à busca de Pins do Pinterest para decoração.',
+      'Em locais ainda fora do catálogo inicial, agora mostramos um caminho real para pesquisar, em vez de resultados fixos de outra cidade.',
+      'As fotos encontradas podem ser vinculadas a uma nova referência pelo formulário de publicação, com a fonte original preservada.',
+      'A busca totalmente automática dentro do Duet continua dependendo da integração do serviço de pesquisa no Render.',
+    ],
+  },
+  {
     version: '2.8.1', date: '2026-10-24', title: 'Dream Match com fotos de verdade',
     kind: 'Correções',
     highlights: [
