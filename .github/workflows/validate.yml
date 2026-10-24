@@ -40,7 +40,7 @@ jobs:
               echo 'Each product release must bump the version in release-notes.ts, not only edit the changelog.'
               exit 1
             fi
-            if [[ "$(printf '%s\\n' "$previous" "$current" | sort -V | tail -n 1)" != "$current" ]]; then
+            if [[ "$(printf '%s\n' "$previous" "$current" | sort -V | tail -n 1)" != "$current" ]]; then
               echo "Release version $current must be newer than $previous."
               exit 1
             fi
