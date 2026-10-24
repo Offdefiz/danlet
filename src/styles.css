@@ -1117,3 +1117,30 @@ body:has(.duet-release-dialog[data-state="open"]) {
     -webkit-backdrop-filter: none;
   }
 }
+
+
+/* Dream Match — media-first galleries, native photo cards and third-party
+   public embeds kept inside the phone viewport without horizontal overflow. */
+.dream-social-embed {
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+  overflow-x: hidden;
+}
+.dream-social-embed .instagram-media {
+  min-width: 0 !important;
+  max-width: 100% !important;
+  width: 100% !important;
+  margin-inline: auto !important;
+  border-radius: 1rem !important;
+}
+.dream-social-embed iframe {
+  max-width: 100% !important;
+}
+@media (max-width: 380px) {
+  [aria-label="Seções do Dream Match"] [role="tab"] {
+    min-width: 0;
+    padding-inline: 2px;
+    border-radius: 1rem;
+  }
+}

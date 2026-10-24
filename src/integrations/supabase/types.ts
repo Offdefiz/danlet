@@ -405,18 +405,21 @@ export type Database = {
       votes: {
         Row: {
           liked: boolean
+          super_liked: boolean
           reference_id: string
           updated_at: string
           user_id: string
         }
         Insert: {
           liked: boolean
+          super_liked?: boolean
           reference_id: string
           updated_at?: string
           user_id: string
         }
         Update: {
           liked?: boolean
+          super_liked?: boolean
           reference_id?: string
           updated_at?: string
           user_id?: string

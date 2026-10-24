@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { useQueryClient } from '@tanstack/react-query';
 import { useServerFn } from '@tanstack/react-start';
 import { AnimatePresence, motion, useReducedMotion } from 'framer-motion';
-import { Heart, House, ListChecks, Plus, X, Check, Instagram, ExternalLink, MapPin, Flower2, ArrowLeft, Search, LogOut, Pencil, Trash2, Camera, Clock, BookHeart, CheckCheck, UserRound, CalendarDays } from 'lucide-react';
+import { Heart, House, ListChecks, Plus, X, Check, Instagram, ExternalLink, MapPin, Flower2, ArrowLeft, Search, LogOut, Pencil, Trash2, Camera, Clock, BookHeart, CheckCheck, UserRound, CalendarDays, Star } from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -12,7 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDuet } from '@/hooks/use-duet';
 import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@/lib/duet.types';
 import { DuetMusic } from '@/components/duet-music';
-import { findReferences, fetchPhoto, addFromInstagram } from '@/lib/duet.functions';
+import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
+import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
+import { DreamPlatformPreview, DreamReferencePhoto } from '@/components/dream-media';
+import { optimizeDreamPhoto } from '@/lib/dream-photo';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -30,7 +33,7 @@ import { parseQuestionLink } from '@/lib/weekend-prompts';
 import { parseProposalLink } from '@/lib/juntos-suggestions';
 
 type RecordForm = { id?: string; version?: number; kind: 'goal' | 'task' | 'note' | 'setting'; title: string; body: string; period: string; reference_id?: string | null; done?: boolean };
-type SearchItem = { title: string; description: string; source_url: string };
+type SearchItem = { title: string; description: string; source_url: string; image: string };
 const dateLabel = (s: string) => new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
 export function DuetOrganizer({ userId }: { userId: string }) {
@@ -41,7 +44,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [scenery, setScenery] = useState('');
-  const [history, setHistory] = useState(false);
+  const [dreamSection, setDreamSection] = useState<DreamSection>('discover');
   const [historyFilter, setHistoryFilter] = useState('Minhas escolhas');
   const [period, setPeriod] = useState(periods[0]);
   const [form, setForm] = useState<RecordForm | null>(null);
@@ -61,9 +64,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right'>('right');
   const [refInsta, setRefInsta] = useState('');
   const [refDescription, setRefDescription] = useState('');
+  const [refTitle, setRefTitle] = useState('');
+  const [manualPhoto, setManualPhoto] = useState<File | null>(null);
+  const [searchPhoto, setSearchPhoto] = useState<File | null>(null);
+  const [searchPhotoUrl, setSearchPhotoUrl] = useState('');
   const search = useServerFn(findReferences);
   const getPhoto = useServerFn(fetchPhoto);
-  const addInsta = useServerFn(addFromInstagram);
+  const importReference = useServerFn(importDreamReference);
   const triedPhotos = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   useEffect(() => {
@@ -135,14 +142,21 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       }); if (saved) setForm(null);
     } else if (await mutate(() => supabase.from('records').insert({ ...payload, created_by: userId }))) setForm(null);
   }
-  async function vote(ref: Row<'references_catalog'>, liked: boolean) {
+  async function vote(ref: Row<'references_catalog'>, liked: boolean, superLike = false) {
+    if (!hasDreamPhoto(ref)) { toast.error('Precisamos adicionar uma foto real antes de votar nesta referência.'); setDreamSection('photos'); return; }
     setSwipeDirection(liked ? 'right' : 'left');
     setLocallyVoted(previous => new Set(previous).add(ref.id));
-    const saved = await mutate(() => supabase.from('votes').upsert({ reference_id: ref.id, user_id: userId, liked, updated_at: new Date().toISOString() }));
+    const saved = await mutate(() => supabase.from('votes').upsert({
+      reference_id: ref.id, user_id: userId, liked: liked || superLike,
+      super_liked: superLike, updated_at: new Date().toISOString(),
+    }));
     if (!saved) setLocallyVoted(previous => { const next = new Set(previous); next.delete(ref.id); return next; });
     else if (liked && partnerVote(data?.votes ?? [], ref.id, userId)?.liked) {
       playDuetSound('match', userId);
-      toast.success(`Match! Você e ${partnerName} curtiram ${ref.title}. ♡`);
+      toast.success(`É MATCH! Você e ${partnerName} escolheram ${ref.title}. ♡`);
+    } else if (saved && superLike) {
+      playDuetSound('success', userId);
+      toast.success(`${ref.title} foi para seus Super Likes! ⭐`);
     } else if (saved) playDuetSound(liked ? 'success' : 'question', userId);
   }
   async function sign(record: Row<'records'>) {
@@ -161,16 +175,54 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     catch (err) { setSearchError(err instanceof Error ? err.message : 'Não foi possível pesquisar.'); }
     finally { setBusy(false); }
   }
+  async function uploadDreamPhoto(file: File): Promise<string> {
+    const prepared = await optimizeDreamPhoto(file);
+    const path = `${userId}/dream-${crypto.randomUUID()}.jpg`;
+    const { error } = await supabase.storage.from('duet-photos').upload(path, prepared, {
+      contentType: 'image/jpeg', cacheControl: '3600',
+    });
+    if (error) throw new Error('Falha ao enviar foto: ' + error.message);
+    return path;
+  }
   async function include(item: SearchItem) {
-    if (await mutate(() => supabase.from('references_catalog').insert({ ...item, category, created_by: userId, verification: 'A confirmar' }))) setResults(current => current.filter(r => r.source_url !== item.source_url));
+    setBusy(true);
+    try {
+      const attached = searchPhotoUrl === item.source_url && searchPhoto
+        ? await uploadDreamPhoto(searchPhoto) : null;
+      const added = await importReference({ data: {
+        source_url: item.source_url, category, title: item.title.slice(0,160),
+        notes: item.description, uploaded_path: attached,
+      } });
+      toast.success(`${added.title} entrou no Dream Match com foto! ♡`);
+      setResults(list => list.filter(ref => ref.source_url !== item.source_url));
+      setSearchPhoto(null); setSearchPhotoUrl('');
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível incluir.'); }
+    finally { setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
     e.preventDefault();
-    const handle = refInsta.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '').replace(/\/.*$/, '');
-    if (!/^[A-Za-z0-9._]{1,30}$/.test(handle)) { toast.error('Digite um @ válido, ex.: @villapaolucci'); return; }
+    const raw = refInsta.trim();
+    const url = /^@?[A-Za-z0-9._]{1,30}$/.test(raw) && sourceForCategory(category)==='instagram'
+      ? `https://www.instagram.com/${raw.replace(/^@/,'')}/` : raw;
+    if (!isDreamSourceUrl(url,category)) {
+      toast.error(category === 'Decoração' ? 'Cole o link de um Pin público do Pinterest.' : 'Cole o perfil ou publicação pública do Instagram.');
+      return;
+    }
     setBusy(true);
-    try { const r = await addInsta({ data: { handle, category, notes: refDescription } }); toast.success(`${r.title} adicionado ♡`); await cache.invalidateQueries({ queryKey: ['duet', userId] }); setAddReference(false); setRefInsta(''); setRefDescription(''); }
-    catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível adicionar.'); }
+    try {
+      const attached = manualPhoto ? await uploadDreamPhoto(manualPhoto) : null;
+      const name = refTitle.trim() || (sourceForCategory(category)==='instagram'
+        ? '@' + new URL(url).pathname.split('/').filter(Boolean).pop()
+        : 'Inspiração de decoração · Pinterest');
+      const added = await importReference({ data: {
+        source_url: url, category, title: name.slice(0,160),
+        notes: refDescription, uploaded_path: attached,
+      } });
+      toast.success(`${added.title} salvo com fotografia ♡`);
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+      setAddReference(false); setRefInsta(''); setRefTitle(''); setRefDescription(''); setManualPhoto(null);
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.'); }
     finally { setBusy(false); }
   }
   async function uploadAvatar(file: File) {
@@ -192,12 +244,19 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     if (ok) toast.success('Foto otimizada e atualizada ♡');
   }
   async function upload(file: File, ref: Row<'references_catalog'>) {
-    if (!file.type.startsWith('image/') || file.size > 10 * 1024 * 1024) { toast.error('Escolha uma imagem de até 10 MB.'); return; }
-    const path = `${userId}/${crypto.randomUUID()}.${file.name.split('.').pop()?.replace(/[^a-z0-9]/gi, '') || 'jpg'}`;
-    await mutate(async () => {
-      const sent = await supabase.storage.from('duet-photos').upload(path, file); if (sent.error) return sent;
-      return supabase.from('references_catalog').update({ image_path: path, image_credit: `Foto enviada por ${me?.person ?? 'nós'}` }).eq('id', ref.id);
-    });
+    setBusy(true);
+    try {
+      const path = await uploadDreamPhoto(file);
+      const { error } = await supabase.from('references_catalog').update({
+        image_path: path,
+        image_credit: 'Foto autorizada enviada pelo casal',
+      }).eq('id', ref.id);
+      if (error) throw error;
+      toast.success('Foto salva! A referência já pode aparecer no Dream Match.');
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Erro ao adicionar foto.');
+    } finally { setBusy(false); }
   }
   async function signOut() { await cache.cancelQueries(); cache.clear(); await supabase.auth.signOut(); window.history.replaceState(null, '', '/'); }
   if (query.isPending) return <div className="flex min-h-screen items-center justify-center text-muted-foreground">Abrindo nosso espaço…</div>;
@@ -207,14 +266,15 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const notes = data.records.filter(r => r.kind === 'note' && !r.reference_id);
   const complete = goals.filter(g => data.signatures.filter(s => s.record_id === g.id).length === 2).length;
   const refs = data.references.filter(r => r.category === category && (!state || r.state === state) && (!city || r.city === city) && (!scenery || r.scenery === scenery));
-  const pending = rankReferences(refs.filter(r => !(data.votes.some(v => v.reference_id === r.id && v.user_id === userId) || locallyVoted.has(r.id))), data.votes, userId, data.references);
+  const collections = dreamCollections(refs, data.votes, userId);
+  const pending = rankReferences(collections.discovery.filter(ref => !locallyVoted.has(ref.id)), data.votes, userId, data.references);
   const current = pending[0];
-  const historyRefs = refs.filter(r => {
+  const historyRefs = collections.history.filter(r => {
     const my = data.votes.find(v => v.reference_id === r.id && v.user_id === userId);
     const other = partnerVote(data.votes, r.id, userId);
-    if (historyFilter === 'Matches') return isMatch(data.votes, r.id);
     if (historyFilter === 'Descartados') return my?.liked === false;
-    return historyFilter === 'Escolhas do parceiro' ? Boolean(other) : Boolean(my);
+    if (historyFilter === 'Escolhas do parceiro') return Boolean(other);
+    return Boolean(my);
   });
   const edit = (r: Row<'records'>) => setForm({ ...r, kind: r.kind as RecordForm['kind'] });
   const weddingDate = data.records.find(r => r.kind === 'setting' && r.title === 'Data do casamento');
@@ -235,20 +295,166 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </div>
     </header>{!online && <div role="status" className="app-shell mt-3 rounded-xl border border-warning/30 bg-secondary px-4 py-3 text-sm text-secondary-foreground">Você está sem internet. Suas alterações serão salvas quando a conexão voltar; confira antes de fechar o aplicativo.</div>}<main className="app-shell py-7 sm:py-10">
     {tab === 'home' && <div className="space-y-9"><section className="border-b border-border pb-7"><p className="text-xs uppercase tracking-widest text-muted-foreground">Nosso espaço a dois</p><h1 className="mt-3 text-3xl font-semibold sm:text-4xl">Oi, {me?.person}. <span className="text-primary">♡</span></h1><p className="mt-3 text-muted-foreground">O que vamos construir juntos hoje?</p><div className="mt-6 flex flex-wrap gap-2"><Button onClick={() => newRecord('task')}><Plus/>Próximo passo</Button><Button variant="outline" onClick={() => newRecord('note')}><Pencil/>Anotar</Button></div><Button variant="outline" className="mt-3" onClick={() => {playDuetSound('question',userId);setTab('together');}}><Heart size={16}/> Vamos combinar nosso fim de semana?</Button></section><DuetHighlights records={data.records} references={data.references} votes={data.votes} userId={userId} onNavigate={setTab}/><DuetUpdatesPreview/><section className="garden-band flex flex-wrap items-center justify-between gap-6 border-y border-border py-7"><div><div className="flex items-center gap-2 text-success"><Flower2 size={18}/><span className="text-xs uppercase tracking-widest">Nosso casamento</span></div><h2 className="mt-3 text-2xl font-semibold">Um sim, do nosso jeito.</h2><p className="mt-2 text-sm text-muted-foreground">English Garden · flores, jardim e nós dois</p><Button variant="link" className="mt-3 px-0" onClick={() => { setCategory('Locais'); setTab('dream'); }}>Encontrar nosso lugar <Heart size={15}/></Button></div><div className="text-right"><p className="text-sm font-medium">{days === null ? 'A data ainda é nossa escolha' : `${days} dias para o nosso sim`}</p><Button variant="ghost" className="mt-2 text-xs" onClick={() => weddingDate ? edit(weddingDate) : setForm({ kind: 'setting', title: 'Data do casamento', body: '', period: periods[0] ?? '' })}><Pencil size={13}/>{weddingDate ? 'Editar data' : 'Definir data'}</Button></div></section><section><Section title="Próximos passos" action={<Button variant="ghost" size="icon" title="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Um próximo passo de cada vez." action="Adicionar primeiro passo" onClick={() => newRecord('task')}/>}</section><section><Section title="Nosso caderno" action={<Button variant="ghost" size="icon" title="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Espaço para o que não queremos esquecer." action="Escrever uma anotação" onClick={() => newRecord('note')}/>}</section><DuetMusic records={data.records} userId={userId}/><section className="flex items-center justify-between border-t border-border pt-6"><div><p className="font-medium">Nossos planos</p><p className="mt-1 text-sm text-muted-foreground">{goals.length ? `${complete} de ${goals.length} metas concluídas pelos dois` : 'Nenhuma meta definida ainda'}</p></div><Button variant="outline" onClick={() => setTab('plans')}>Ver planos</Button></section><section><Section title="Últimas atualizações"/>{data.activity.slice(0,5).map(a => <div key={a.id} className="flex justify-between gap-4 border-b border-border py-3 text-xs text-muted-foreground"><span>{data.members.find(m => m.user_id === a.actor_id)?.person ?? 'Nós'} · {a.entity_type === 'votes' ? 'avaliou uma referência' : a.entity_type === 'signatures' ? 'assinou uma meta' : a.action === 'DELETE' ? 'excluiu um registro' : 'atualizou nossos planos'}</span><span>{dateLabel(a.created_at)}</span></div>)}{!data.activity.length && <p className="text-sm text-muted-foreground">Nossas atualizações aparecerão aqui.</p>}</section></div>}
-    {tab === 'dream' && <div className="mx-auto max-w-xl"><p className="text-xs uppercase tracking-widest text-muted-foreground">Descobertas a dois</p><div className="mt-2 flex items-center justify-between"><h1 className="text-3xl font-semibold">Dream Match <span className="text-primary">♡</span></h1><Button variant="ghost" size="icon" title="Adicionar referência" aria-label="Adicionar referência" onClick={() => setAddReference(true)}><Plus/></Button></div><div className="my-5 flex flex-wrap gap-2">{categories.map(c => <Button key={c} variant={category === c ? 'default' : 'outline'} onClick={() => { setCategory(c); setCity(''); setState(''); setScenery(''); }} className="text-xs">{c}</Button>)}</div><div className="mb-4 grid grid-cols-3 gap-2"><Select label="Estado" value={state} onChange={v => { setState(v); setCity(''); }} options={[...new Set(data.references.filter(r => r.category === category).map(r => r.state).filter(Boolean))]}/><Select label="Cidade" value={city} onChange={setCity} options={[...new Set(data.references.filter(r => r.category === category && (!state || r.state === state)).map(r => r.city).filter(Boolean))]}/><Select label="Cenário" value={scenery} onChange={setScenery} options={[...new Set(refs.map(r => r.scenery).filter(Boolean))]}/></div><div className="mb-5 flex justify-between gap-2"><Button variant="ghost" className="px-0 text-xs" onClick={() => setHistory(!history)}>{history ? <ArrowLeft/> : <BookHeart/>}{history ? 'Voltar às descobertas' : 'Nosso histórico'}</Button><Button variant="outline" className="text-xs" onClick={() => setSearchOpen(true)}><Search/>Buscar novas opções</Button></div>
-      {!history && <section aria-label="Sugestões para o casal" className="mb-5 rounded-2xl border border-border bg-card p-4">
-        <h2 className="text-sm font-semibold">Sugestões para vocês ♡</h2>
-        <p className="mt-1 text-xs text-muted-foreground">Ordenadas pelas curtidas de vocês. Apenas opções já cadastradas no Duet.</p>
-        {pending.length ? <div className="mt-3 grid gap-2">
-          {pending.slice(0, 3).map(reference => <button key={reference.id} type="button" className="flex w-full items-center justify-between gap-3 rounded-xl border border-border px-3 py-2 text-left text-sm hover:bg-muted" onClick={() => setDetail(reference)}>
-            <span className="min-w-0"><span className="block truncate font-medium">{reference.title}</span><span className="block text-xs text-muted-foreground">{[reference.city, reference.state].filter(Boolean).join(' · ') || reference.scenery || reference.category}</span></span><Heart size={16} className="shrink-0 text-primary"/>
-          </button>)}
-        </div> : <div className="mt-3 space-y-2"><p className="text-xs text-muted-foreground">Nenhuma opção cadastrada neste filtro. Comecem por uma inspiração:</p>
-          <div className="flex flex-wrap gap-2">{['Tiradentes, MG', 'Ouro Preto, MG', 'Capitólio, MG', 'Guarapari, ES'].map(place =>
-            <Button key={place} variant="outline" size="sm" className="text-xs" onClick={() => { setRegion(place); setSearchOpen(true); }}>{place}</Button>)}</div>
-        </div>}
+    {tab === 'dream' && <div className="mx-auto max-w-xl space-y-5">
+      <div className="flex items-center justify-between gap-2">
+        <div><p className="text-xs font-semibold uppercase tracking-[.16em] text-muted-foreground">Descobertas a dois</p>
+          <h1 className="mt-1 text-3xl font-semibold">Dream Match <span className="text-primary">♡</span></h1>
+        </div>
+        <Button variant="outline" size="icon" title="Adicionar referência com foto" aria-label="Adicionar referência com foto"
+          onClick={() => { setManualPhoto(null); setAddReference(true); }}><Plus/></Button>
+      </div>
+      <div role="tablist" aria-label="Seções do Dream Match" className="grid grid-cols-3 gap-2 rounded-[24px] bg-secondary/60 p-1.5 sm:grid-cols-5">
+        {([
+          { id: 'discover', label: 'Descobrir', count: pending.length },
+          { id: 'favorites', label: 'Super Likes', count: collections.favorites.length },
+          { id: 'matches', label: 'Matches', count: collections.matches.length },
+          { id: 'history', label: 'Histórico', count: collections.history.length },
+          { id: 'photos', label: 'Sem foto', count: collections.photoPending.length },
+        ] as const).map(section => <button key={section.id} type="button" role="tab"
+          aria-selected={dreamSection === section.id}
+          onClick={() => setDreamSection(section.id)}
+          className={'min-h-[58px] min-w-0 rounded-[19px] px-1.5 py-2 text-center transition-colors ' +
+            (dreamSection === section.id ? 'bg-card text-foreground shadow-sm ring-1 ring-primary/35' : 'text-muted-foreground hover:bg-card/50')}>
+          <span className="block truncate text-[11px] font-semibold">{section.label}</span>
+          <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{section.count}</span>
+        </button>)}
+      </div>
+      <div className="flex flex-wrap gap-2">{categories.map(item => <Button key={item} size="sm"
+        className="rounded-full text-xs" variant={category === item ? 'default' : 'outline'}
+        onClick={() => { setCategory(item); setState(''); setCity(''); setScenery(''); }}>{item}</Button>)}</div>
+      <div className="grid grid-cols-3 gap-2">
+        <Select label="Estado" value={state} onChange={value => { setState(value); setCity(''); }}
+          options={[...new Set(data.references.filter(r => r.category === category).map(r => r.state).filter(Boolean))]}/>
+        <Select label="Cidade" value={city} onChange={setCity}
+          options={[...new Set(data.references.filter(r => r.category === category && (!state || r.state === state)).map(r => r.city).filter(Boolean))]}/>
+        <Select label="Cenário" value={scenery} onChange={setScenery}
+          options={[...new Set(refs.map(r => r.scenery).filter(Boolean))]}/>
+      </div>
+      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
+        <span className="text-xs leading-relaxed text-muted-foreground">
+          {category === 'Decoração' ? 'Decoração: fotos e Pins do Pinterest' : 'Locais: publicações e perfis do Instagram'}.
+          Apenas referências com fotografia entram nas escolhas.
+        </span>
+        <Button variant="outline" size="sm" className="shrink-0 rounded-full" onClick={() => setSearchOpen(true)}>
+          <Search size={16}/> Buscar fotos
+        </Button>
+      </div>
+      {dreamSection === 'discover' && <section aria-label="Descobrir lugares e decorações com fotos" className="space-y-4">
+        {current ? <>
+          <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+            <span>{pending.length} {pending.length === 1 ? 'opção com foto' : 'opções com foto'} para avaliar</span>
+            <span>{partnerName}: {voteLabel(partnerVote(data.votes,current.id,userId))}</span>
+          </div>
+          <AnimatePresence mode="wait"><motion.article key={current.id}
+            drag={busy ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.55} dragMomentum={false}
+            onDragEnd={(_, info) => { if (Math.abs(info.offset.x) > 80) void vote(current,info.offset.x > 0); }}
+            initial={reducedMotion ? false : { opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: swipeDirection === 'right' ? 140 : -140 }}
+            transition={{ type: 'spring', stiffness: 250, damping: 27 }}
+            className="overflow-hidden rounded-[30px] border border-border bg-card p-2 shadow-lg">
+            <DreamReferencePhoto reference={current} onUnavailable={() => {setDetail(current);setDreamSection('photos');}}/>
+            <div className="px-4 pb-4 pt-3">
+              <p className="text-xs font-semibold text-primary">{current.category === 'Decoração' ? 'Pinterest · Decoração' : 'Instagram · Local'}</p>
+              <h2 className="mt-1 text-2xl font-semibold leading-tight">{current.title}</h2>
+              <p className="mt-2 text-sm text-muted-foreground">{current.description}</p>
+              <div className="mt-3 flex flex-wrap gap-2">
+                <Button size="sm" variant="outline" className="rounded-full" onClick={() => setDetail(current)}>Ver detalhes</Button>
+                <Button size="sm" variant="ghost" asChild className="rounded-full"><a href={current.source_url} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink size={14}/> Publicação original
+                </a></Button>
+              </div>
+            </div>
+          </motion.article></AnimatePresence>
+          <div className="flex items-center justify-center gap-6 sm:gap-10">
+            <div className="text-center"><Button variant="reject" size="circle" disabled={busy}
+              aria-label="Não curtir" onClick={() => void vote(current,false)}><X/></Button>
+              <p className="mt-1 text-xs text-muted-foreground">Passar</p></div>
+            <div className="text-center"><Button variant="success" size="circle" disabled={busy}
+              aria-label="Curtir" onClick={() => void vote(current,true)}><Heart/></Button>
+              <p className="mt-1 text-xs text-muted-foreground">Curtir</p></div>
+            <div className="text-center"><Button size="circle" variant="outline"
+              className="border-amber-400/60 bg-amber-400/10 text-amber-500 shadow-md" disabled={busy}
+              aria-label={'Super Like: ' + current.title} onClick={() => void vote(current,true,true)}><Star fill="currentColor"/></Button>
+              <p className="mt-1 text-xs font-semibold text-amber-500">Super Like</p></div>
+          </div>
+        </> : <Empty text={'Ainda não há novas referências com fotos. ' + (collections.photoPending.length ? 'Algumas referências antigas precisam de imagem na aba Sem foto.' : 'Busque uma foto do Instagram ou Pinterest para começar.')}
+          action={collections.photoPending.length ? 'Recuperar fotografias' : 'Buscar inspirações'}
+          onClick={() => collections.photoPending.length ? setDreamSection('photos') : setSearchOpen(true)}/>}
       </section>}
-      {history ? <><div className="mb-5 flex flex-wrap gap-2">{['Minhas escolhas','Escolhas do parceiro','Matches','Descartados'].map(f => <Button key={f} variant={historyFilter === f ? 'secondary' : 'ghost'} className="text-xs" onClick={() => setHistoryFilter(f)}>{f}</Button>)}</div><div className="space-y-3">{historyRefs.map(r => <article key={r.id} className="rounded-lg border border-border bg-card p-4"><h2 className="font-semibold">{r.title}</h2><p className="mt-2 text-xs text-muted-foreground">Você: {data.votes.find(v => v.reference_id === r.id && v.user_id === userId)?.liked === true ? 'curtiu' : data.votes.find(v => v.reference_id === r.id && v.user_id === userId)?.liked === false ? 'não curtiu' : 'ainda não avaliou'} · {partnerName}: {voteLabel(partnerVote(data.votes,r.id,userId))}</p><div className="mt-3 flex flex-wrap gap-2"><Button size="icon" variant="reject" title="Não curtir" disabled={busy} onClick={() => vote(r,false)}><X/></Button><Button size="icon" variant="success" title="Curtir" disabled={busy} onClick={() => vote(r,true)}><Heart/></Button><Button variant="outline" onClick={() => setDetail(r)}>Detalhes</Button>{isMatch(data.votes,r.id) && !goals.some(g => g.reference_id === r.id) && <Button disabled={busy} onClick={() => promote(r)}><Plus/>Levar aos planos</Button>}</div></article>)}{!historyRefs.length && <Empty text="Ainda não há escolhas neste filtro."/>}</div></> : current ? <><div className="mb-3 flex items-center justify-between text-xs text-muted-foreground"><span>{pending.length} {pending.length === 1 ? 'descoberta' : 'descobertas'} para você</span><span className="text-success">{partnerName}: {voteLabel(partnerVote(data.votes,current.id,userId))}</span></div><AnimatePresence mode="wait"><motion.article key={current.id} drag={busy ? false : 'x'} dragConstraints={{ left: 0, right: 0 }} dragElastic={0.65} dragMomentum={false} onDragEnd={(_, info) => { if (Math.abs(info.offset.x) > 75) void vote(current,info.offset.x > 0); }} initial={reducedMotion ? false : { opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} exit={reducedMotion ? { opacity: 0 } : { opacity: 0, x: swipeDirection === 'right' ? 160 : -160, rotate: swipeDirection === 'right' ? 8 : -8 }} transition={{ type: 'spring', stiffness: 260, damping: 28 }} className="overflow-hidden rounded-lg border border-border bg-card"><ReferencePhoto reference={current}/><div className="p-5"><div className="flex items-center gap-2 text-[11px] font-medium text-success"><MapPin size={13}/>{[current.city,current.state].filter(Boolean).join(' · ') || current.scenery || current.category}</div><h2 className="mt-2 text-2xl font-semibold leading-tight">{current.title}</h2><p className="mt-3 text-sm leading-relaxed text-muted-foreground">{current.description}</p><p className="mt-3 text-[10px] text-muted-foreground">{current.verification} · fonte consultada em {dateLabel(current.checked_at)}</p><div className="mt-4 flex flex-wrap gap-2"><Button variant="outline" size="sm" onClick={() => setDetail(current)}>Notas e detalhes</Button>{current.instagram_url && <Button asChild variant="ghost" size="sm"><a href={current.instagram_url} target="_blank" rel="noreferrer"><Instagram/>Instagram</a></Button>}<Button asChild variant="ghost" size="sm"><a href={current.source_url} target="_blank" rel="noreferrer"><ExternalLink/>Fonte</a></Button></div></div></motion.article></AnimatePresence><div className="mt-6 flex items-center justify-center gap-12"><div className="text-center"><Button variant="reject" size="circle" aria-label="Não curtir esta opção" disabled={busy} onClick={() => vote(current,false)}><X/></Button><p className="mt-2 text-xs text-muted-foreground">Não é para nós</p></div><div className="text-center"><Button variant="success" size="circle" aria-label="Curtir esta opção" disabled={busy} onClick={() => vote(current,true)}><Heart/></Button><p className="mt-2 text-xs text-muted-foreground">Eu gostei</p></div></div></> : <Empty text="As descobertas deste filtro acabaram. Nossas escolhas continuam no histórico." action="Buscar novas opções" onClick={() => setSearchOpen(true)}/>}</div>}
+      {dreamSection === 'favorites' && <section aria-label="Super Likes favoritos" className="space-y-3">
+        <div className="flex items-center gap-2 rounded-2xl border border-amber-400/30 bg-amber-400/10 p-3">
+          <Star size={20} className="shrink-0 text-amber-500" fill="currentColor"/>
+          <p className="text-sm">Seus Super Likes ficam guardados aqui, mesmo antes de a outra pessoa curtir.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">
+          {collections.favorites.map(ref => <article key={ref.id} className="overflow-hidden rounded-[24px] border border-border bg-card p-2">
+            <DreamReferencePhoto reference={ref} compact onUnavailable={() => setDetail(ref)}/>
+            <div className="px-1.5 pb-1 pt-2"><p className="truncate text-sm font-semibold">{ref.title}</p>
+              <p className="mt-1 text-[11px] text-muted-foreground">{isMatch(data.votes,ref.id) ? 'Match do casal ♡' : 'Esperando a escolha do par'}</p>
+              <div className="mt-2 flex flex-wrap gap-1">
+                <Button size="sm" variant="outline" className="rounded-full text-xs" onClick={() => setDetail(ref)}>Ver</Button>
+                <Button size="sm" variant="ghost" className="rounded-full text-xs text-amber-500"
+                  disabled={busy} onClick={() => void vote(ref,true,false)}>Tirar estrela</Button>
+              </div>
+            </div>
+          </article>)}
+        </div>
+        {!collections.favorites.length && <Empty text="Nenhum Super Like ainda. Uma estrela no swipe salva a sua inspiração favorita!"/>}
+      </section>}
+      {dreamSection === 'matches' && <section aria-label="Matches do casal" className="space-y-3">
+        <div className="rounded-2xl border border-primary/25 bg-secondary/50 p-4">
+          <h2 className="flex items-center gap-2 text-lg font-semibold"><Heart fill="currentColor" className="text-primary"/> É match! ♡</h2>
+          <p className="mt-1 text-sm text-muted-foreground">Só aparecem aqui as referências que você e {partnerName} curtiram. Igual ao Tinder, mas com os sonhos de vocês.</p>
+        </div>
+        <div className="grid grid-cols-2 gap-3">{collections.matches.map(ref => <article key={ref.id}
+          className="overflow-hidden rounded-[24px] border border-primary/25 bg-card p-2">
+          <DreamReferencePhoto compact reference={ref} onUnavailable={() => setDetail(ref)}/>
+          <div className="space-y-2 px-1 pb-1 pt-2"><p className="truncate text-sm font-semibold">{ref.title}</p>
+            <p className="text-xs font-medium text-primary">♡ Os dois gostaram</p>
+            <Button variant="outline" size="sm" className="w-full rounded-full" onClick={() => setDetail(ref)}>Detalhes</Button>
+            {!goals.some(goal => goal.reference_id === ref.id) && <Button size="sm" className="w-full rounded-full"
+              disabled={busy} onClick={() => void promote(ref)}><Plus size={15}/> Planos</Button>}
+          </div>
+        </article>)}</div>
+        {!collections.matches.length && <Empty text="Quando vocês dois curtirem a mesma foto, ela aparecerá aqui como Match!"/>}
+      </section>}
+      {dreamSection === 'history' && <section aria-label="Histórico de escolhas" className="space-y-3">
+        <div className="flex flex-wrap gap-2">{['Minhas escolhas','Escolhas do parceiro','Descartados'].map(value =>
+          <Button key={value} variant={historyFilter === value ? 'secondary' : 'outline'} size="sm" className="rounded-full"
+            onClick={() => setHistoryFilter(value)}>{value}</Button>)}</div>
+        {historyRefs.map(ref => <article key={ref.id} className="flex gap-3 rounded-2xl border border-border bg-card p-3">
+          <div className="w-28 shrink-0"><DreamReferencePhoto compact reference={ref} onUnavailable={() => setDetail(ref)}/></div>
+          <div className="min-w-0 flex-1"><h3 className="text-sm font-semibold">{ref.title}</h3>
+            <p className="mt-1 text-xs text-muted-foreground">Você: {voteLabel(data.votes.find(v => v.reference_id === ref.id && v.user_id === userId))}
+              {' · '}{partnerName}: {voteLabel(partnerVote(data.votes,ref.id,userId))}</p>
+            <div className="mt-2 flex flex-wrap gap-2"><Button size="sm" variant="outline" onClick={() => setDetail(ref)}>Detalhes</Button>
+              <Button size="sm" className="rounded-full" variant="outline" disabled={busy}
+                onClick={() => void vote(ref,true,true)}><Star size={14}/> Favorito</Button>
+            </div>
+          </div>
+        </article>)}
+        {!historyRefs.length && <Empty text="Ainda não há escolhas nesse filtro."/>}
+      </section>}
+      {dreamSection === 'photos' && <section aria-label="Referências aguardando fotografia" className="space-y-3">
+        <div className="rounded-2xl border border-warning/40 bg-secondary/50 p-4">
+          <h2 className="flex items-center gap-2 text-base font-semibold"><Camera size={20}/> Precisam de foto</h2>
+          <p className="mt-2 text-sm text-muted-foreground">Esses cadastros antigos foram preservados, mas não entram no swipe, Super Likes ou Matches sem uma fotografia real. Anexe uma foto que vocês tenham permissão para usar.</p>
+        </div>
+        {collections.photoPending.map(ref => <article key={ref.id} className="flex flex-col gap-2 rounded-2xl border border-border bg-card p-4">
+          <h3 className="font-semibold">{ref.title}</h3>
+          <p className="text-xs text-muted-foreground">{ref.source_url}</p>
+          <div className="flex flex-wrap gap-2">
+            <Button variant="outline" size="sm" asChild><a href={ref.source_url} target="_blank" rel="noopener noreferrer"><ExternalLink size={14}/> Consultar fonte</a></Button>
+            <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-primary bg-primary px-4 py-2 text-sm font-semibold text-primary-foreground">
+              <Camera size={16}/> Anexar foto
+              <input aria-label={'Foto para ' + ref.title} type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+                onChange={event => { const file = event.target.files?.[0]; if (file) void upload(file,ref); event.currentTarget.value=''; }}/>
+            </label>
+          </div>
+        </article>)}
+        {!collections.photoPending.length && <Empty text="Ótimo! Todas as referências desta categoria têm foto cadastrada."/>}
+      </section>}
+    </div>}
     {tab === 'together' && <DuetQuestions userId={userId} proposals={data.proposals} proposalVotes={data.proposalVotes} members={data.members} onSaved={() => cache.invalidateQueries({ queryKey: ['duet', userId] })}/>}
     {tab === 'calendar' && <DuetCalendar userId={userId} records={data.records} onSaved={() => cache.invalidateQueries({ queryKey: ['duet', userId] })}/>}
     {tab === 'list' && <section className="mx-auto max-w-2xl space-y-6"><h1 className="text-3xl font-semibold">Nossa lista</h1><p className="text-sm text-muted-foreground">Tarefas e anotações do casal, num só lugar.</p><Section title="Tarefas" action={<Button size="icon" variant="outline" aria-label="Adicionar tarefa" onClick={() => newRecord('task')}><Plus/></Button>}/>{tasks.length ? recordsList(tasks, true) : <Empty text="Ainda não há tarefas." action="Adicionar tarefa" onClick={() => newRecord('task')}/>}<Section title="Anotações" action={<Button size="icon" variant="outline" aria-label="Adicionar anotação" onClick={() => newRecord('note')}><Plus/></Button>}/>{notes.length ? recordsList(notes) : <Empty text="Ainda não há anotações." action="Adicionar anotação" onClick={() => newRecord('note')}/>}</section>}
@@ -332,9 +538,106 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     </div>
   </DialogContent></Dialog>
   <Dialog open={Boolean(form)} onOpenChange={o => { if (!o) setForm(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{form?.id ? 'Editar' : 'Adicionar'} {form?.kind === 'goal' ? 'meta' : form?.kind === 'task' ? 'próximo passo' : form?.kind === 'setting' ? 'data do casamento' : 'anotação'}</DialogTitle></DialogHeader>{form && <form onSubmit={saveRecord} className="space-y-4">{form.kind !== 'setting' && <label className="block text-sm">Título<Input required value={form.title} onChange={e => setForm({ ...form,title:e.target.value })} className="mt-2" maxLength={200}/></label>}<label className="block text-sm">{form.kind === 'setting' ? 'Data' : 'Anotações'}{form.kind === 'setting' ? <Input type="date" required value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2"/> : <Textarea value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2 min-h-28" maxLength={10000}/>}</label>{form.kind === 'goal' && <Select label="Prazo" value={form.period} onChange={v => setForm({ ...form,period:v })} options={periods} noAll/>}<Button disabled={busy} className="w-full">{busy ? 'Salvando…' : 'Salvar'}</Button></form>}</DialogContent></Dialog>
-  <Dialog open={Boolean(detail)} onOpenChange={o => { if (!o) setDetail(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{detail?.title}</DialogTitle></DialogHeader>{detail && <><ReferencePhoto reference={data.references.find(r => r.id === detail.id) ?? detail}/><p className="text-sm text-muted-foreground">{detail.description}</p><p className="text-xs text-success">{partnerName}: {voteLabel(partnerVote(data.votes,detail.id,userId))}</p><div className="flex flex-wrap gap-2">{detail.instagram_url && <Button asChild variant="outline"><a href={detail.instagram_url} target="_blank" rel="noreferrer"><Instagram/>Instagram</a></Button>}<Button asChild variant="outline"><a href={detail.source_url} target="_blank" rel="noreferrer"><ExternalLink/>Fonte</a></Button></div><label className="flex cursor-pointer items-center gap-2 text-sm text-primary"><Camera size={16}/>Enviar foto autorizada<input aria-label="Enviar foto autorizada" type="file" accept="image/*" className="sr-only" onChange={e => { const file = e.target.files?.[0]; if (file) void upload(file,detail); }}/></label><Section title="Nossas anotações" action={<Button size="icon" variant="ghost" title="Adicionar nota ao local" onClick={() => newRecord('note',detail.id)}><Plus/></Button>}/>{recordsList(data.records.filter(r => r.kind === 'note' && r.reference_id === detail.id))}{isMatch(data.votes,detail.id) && !goals.some(g => g.reference_id === detail.id) && <Button disabled={busy} onClick={() => promote(detail)}>Levar match aos planos</Button>}</>}</DialogContent></Dialog>
-  <Dialog open={searchOpen} onOpenChange={setSearchOpen}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>Novas descobertas · {category}</DialogTitle></DialogHeader><label className="text-sm">Cidade ou estado<Input value={region} onChange={e => setRegion(e.target.value)} placeholder="Ex.: Tiradentes, MG" className="mt-2" maxLength={100}/></label><Button disabled={busy} onClick={runSearch}><Search/>{busy ? 'Pesquisando…' : 'Pesquisar'}</Button>{searchError && <p role="status" className={`text-sm ${results.length ? 'text-muted-foreground' : 'text-danger'}`}>{searchError}</p>}{rankedResults.map(r => <div key={r.source_url} className="border-t border-border pt-4"><h3 className="font-medium">{r.title}</h3><p className="mt-2 text-xs text-muted-foreground">{r.description}</p><div className="mt-3 flex gap-2"><Button asChild variant="outline" size="sm"><a href={r.source_url} target="_blank" rel="noreferrer">Revisar fonte<ExternalLink/></a></Button><Button size="sm" disabled={busy || data.references.some(x => x.source_url === r.source_url && x.title === r.title)} onClick={() => include(r)}><Plus/>Incluir para avaliar</Button></div></div>)}</DialogContent></Dialog>
-  <Dialog open={addReference} onOpenChange={setAddReference}><DialogContent><DialogHeader><DialogTitle>Adicionar referência · {category}</DialogTitle></DialogHeader><form onSubmit={saveReference} className="space-y-4"><label className="block text-sm">@ do Instagram<Input required autoFocus value={refInsta} onChange={e => setRefInsta(e.target.value)} placeholder="@villapaolucci" className="mt-2"/><span className="mt-1 block text-xs text-muted-foreground">Nome e foto são buscados automaticamente.</span></label><label className="block text-sm">Anotações<Textarea value={refDescription} onChange={e => setRefDescription(e.target.value)}/></label><Button disabled={busy} className="w-full">{busy ? 'Buscando perfil…' : 'Adicionar'}</Button></form></DialogContent></Dialog>
+  <Dialog open={Boolean(detail)} onOpenChange={open => { if (!open) setDetail(null); }}>
+    <DialogContent className="max-h-[85dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>{detail?.title}</DialogTitle></DialogHeader>
+      {detail && <>
+        <DreamReferencePhoto reference={data.references.find(ref => ref.id === detail.id) ?? detail}/>
+        <p className="text-sm text-muted-foreground">{detail.description}</p>
+        <p className="text-xs font-semibold text-primary">{partnerName}: {voteLabel(partnerVote(data.votes,detail.id,userId))}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline"><a href={detail.source_url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={16}/> {detail.category === 'Decoração' ? 'Pinterest original' : 'Instagram original'}
+          </a></Button>
+          {hasDreamPhoto(detail) && <Button variant="outline"
+            disabled={busy} onClick={() => void vote(detail,true,true)}><Star size={16}/> Super Like</Button>}
+        </div>
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-full border border-border px-4 text-sm font-semibold text-primary">
+          <Camera size={17}/> {detail.image_path ? 'Substituir foto' : 'Adicionar foto obrigatória'}
+          <input aria-label="Enviar foto autorizada" type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            onChange={e => { const file=e.target.files?.[0]; if (file) void upload(file,detail); e.currentTarget.value=''; }}/>
+        </label>
+        <Section title="Nossas anotações" action={<Button size="icon" variant="ghost"
+          title="Adicionar nota à referência" onClick={() => newRecord('note',detail.id)}><Plus/></Button>}/>
+        {recordsList(data.records.filter(record => record.kind === 'note' && record.reference_id === detail.id))}
+        {isMatch(data.votes,detail.id) && !goals.some(goal => goal.reference_id === detail.id)
+          && <Button disabled={busy} onClick={() => promote(detail)}>Levar Match aos planos</Button>}
+      </>}
+    </DialogContent>
+  </Dialog>
+  <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
+    <DialogContent className="max-h-[87dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>Buscar {category === 'Decoração' ? 'no Pinterest' : 'no Instagram'}</DialogTitle></DialogHeader>
+      <p className="text-xs text-muted-foreground">
+        {category === 'Decoração'
+          ? 'Somente Pins públicos do Pinterest. A foto aparece na prévia oficial; para salvar no baralho, anexe uma imagem permitida.'
+          : 'Somente perfis e publicações públicas do Instagram. Quando a rede não disponibiliza uma foto para uso no Duet, você pode anexar uma imagem autorizada.'}
+      </p>
+      <label className="text-sm">Região, estilo ou cidade
+        <Input value={region} onChange={e => setRegion(e.target.value)}
+          placeholder={category === 'Decoração' ? 'Ex.: jardim inglês, iluminação delicada' : 'Ex.: Tiradentes, MG'}
+          className="mt-2" maxLength={100}/>
+      </label>
+      <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
+      {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
+      {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
+        <h3 className="text-base font-semibold">{item.title}</h3>
+        {item.image && category !== 'Decoração'
+          ? <img src={item.image} alt={'Prévia pública no Instagram: ' + item.title}
+              className="mx-auto max-h-[310px] w-full rounded-2xl bg-muted object-contain" loading="lazy"/>
+          : <DreamPlatformPreview key={item.source_url} category={category} sourceUrl={item.source_url}/>}
+        <p className="text-xs text-muted-foreground">{item.description}</p>
+        <p className="text-xs text-muted-foreground">A imagem precisa estar vinculada antes de entrar no swipe.</p>
+        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/60 px-3 text-sm font-medium">
+          <Camera size={16}/>
+          {searchPhotoUrl === item.source_url && searchPhoto ? 'Foto selecionada ✓' : 'Anexar foto autorizada'}
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            aria-label={'Anexar foto de ' + item.title}
+            onChange={event => { const photo=event.target.files?.[0]; if (photo) {setSearchPhoto(photo);setSearchPhotoUrl(item.source_url);} event.currentTarget.value=''; }}/>
+        </label>
+        <div className="flex flex-wrap gap-2">
+          <Button asChild variant="outline" size="sm"><a href={item.source_url} target="_blank" rel="noopener noreferrer">
+            <ExternalLink size={14}/> Ver original
+          </a></Button>
+          <Button size="sm" disabled={busy || data.references.some(ref => ref.source_url===item.source_url)}
+            onClick={() => void include(item)}>
+            <Plus size={15}/> Salvar com foto
+          </Button>
+        </div>
+      </article>)}
+    </DialogContent>
+  </Dialog>
+  <Dialog open={addReference} onOpenChange={setAddReference}>
+    <DialogContent className="max-h-[86dvh] overflow-y-auto rounded-[28px]">
+      <DialogHeader><DialogTitle>Nova inspiração com fotografia ♡</DialogTitle></DialogHeader>
+      <form onSubmit={saveReference} className="space-y-4">
+        <p className="text-xs text-muted-foreground">
+          {category === 'Decoração' ? 'Decoração deve ter um link de Pin do Pinterest.' : 'Locais devem ter perfil ou publicação do Instagram.'}
+        </p>
+        <label className="block text-sm">Link original
+          <Input required value={refInsta} onChange={e => setRefInsta(e.target.value)}
+            placeholder={category === 'Decoração' ? 'https://www.pinterest.com/pin/123…/' : '@perfil ou https://www.instagram.com/p/…/'}
+            className="mt-2" maxLength={2000}/>
+        </label>
+        <label className="block text-sm">Nome da referência
+          <Input value={refTitle} onChange={e => setRefTitle(e.target.value)}
+            placeholder={category === 'Decoração' ? 'Mesa posta em jardim' : 'Local para o casamento'} maxLength={160} className="mt-2"/>
+        </label>
+        <label className="block text-sm">O que gostaram?
+          <Textarea value={refDescription} onChange={e => setRefDescription(e.target.value)} className="mt-2"/>
+        </label>
+        <label className="flex min-h-14 cursor-pointer items-center gap-3 rounded-2xl border border-primary/35 bg-secondary/35 px-4 text-sm">
+          <Camera size={22} className="text-primary"/>
+          <span>{manualPhoto ? 'Foto selecionada: ' + manualPhoto.name : 'Anexar fotografia (JPG, PNG ou WebP)'}</span>
+          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
+            aria-label="Anexar foto à nova inspiração"
+            onChange={event => { setManualPhoto(event.target.files?.[0] ?? null); event.currentTarget.value=''; }}/>
+        </label>
+        <p className="text-xs text-muted-foreground">O Instagram pode liberar a foto pública automaticamente. No Pinterest, é necessário anexar uma imagem que vocês possam usar.</p>
+        <Button type="submit" disabled={busy} className="w-full rounded-2xl">{busy ? 'Salvando foto…' : 'Adicionar ao Dream Match'}</Button>
+      </form>
+    </DialogContent>
+  </Dialog>
   </div>;
 }
 
@@ -342,9 +645,3 @@ function voteLabel(v: Row<'votes'> | undefined) { return v ? v.liked ? 'curtiu �
 function Section({ title, action }: { title: string; action?: React.ReactNode }) { return <div className="mb-4 flex items-center justify-between"><h2 className="text-xl font-semibold">{title}</h2>{action}</div>; }
 function Empty({ text, action, onClick }: { text: string; action?: string; onClick?: () => void }) { return <div className="border-y border-dashed border-border py-9 text-center"><Flower2 className="mx-auto mb-4 text-success" size={28} strokeWidth={1.3}/><p className="mx-auto max-w-xs text-sm leading-relaxed text-muted-foreground">{text}</p>{action && <Button variant="outline" onClick={onClick} className="mt-5">{action}<Plus size={14}/></Button>}</div>; }
 function Select({ label, value, options, onChange, noAll }: { label: string; value: string; options: string[]; onChange: (s: string) => void; noAll?: boolean }) { return <label className="block min-w-0 text-[11px] text-muted-foreground">{label}<select aria-label={label} value={value} onChange={e => onChange(e.target.value)} className="mt-1 h-10 w-full min-w-0 rounded-md border border-input bg-card px-2 text-xs text-foreground">{!noAll && <option value="">Todos</option>}{options.map(o => <option key={o} value={o}>{o}</option>)}</select></label>; }
-function ReferencePhoto({ reference }: { reference: Row<'references_catalog'> }) {
-  const [url, setUrl] = useState('');
-  useEffect(() => { let active = true; setUrl(''); if (reference.image_path) void supabase.storage.from('duet-photos').createSignedUrl(reference.image_path,3600).then(({ data }) => { if (active) setUrl(data?.signedUrl ?? ''); }); return () => { active = false; }; }, [reference.image_path]);
-  if (url) return <a href={reference.instagram_url ?? reference.source_url} target="_blank" rel="noreferrer" className="block"><img src={url} alt={reference.title} className="aspect-[4/3] w-full object-cover"/><span className="block px-3 py-1 text-[10px] text-muted-foreground">{reference.image_credit}</span></a>;
-  return <a href={reference.instagram_url ?? reference.source_url} target="_blank" rel="noreferrer" className="garden-band flex aspect-[16/7] flex-col items-center justify-center gap-3 border-b border-border text-success"><Flower2 size={36} strokeWidth={1.1}/><span className="flex items-center gap-2 text-xs"><ExternalLink size={12}/>{reference.instagram_url ? 'Fotos no Instagram oficial' : 'Ver fotos na fonte'}</span></a>;
-}

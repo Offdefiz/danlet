@@ -12,6 +12,18 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.0', date: '2026-10-23', title: 'Dream Match de verdade ♡',
+    kind: 'Novidades',
+    highlights: [
+      'Dream Match agora tem três áreas distintas: Descobrir, Super Likes e Matches do casal, além de Histórico.',
+      'O Super Like guarda uma inspiração favorita individual sem presumir que o parceiro concordou.',
+      'Um Match aparece no seu espaço próprio somente depois de dois likes.',
+      'Busca de locais restrita a publicações e perfis públicos do Instagram; decoração restrita a Pins do Pinterest.',
+      'Nenhuma referência nova entra no swipe sem fotografia; itens antigos sem imagem ficam na aba Sem foto para recuperar.',
+      'Fotos do casal ficam otimizadas no Supabase. Prévia pública do Instagram é usada quando disponível; Pins são mostrados pelo widget oficial e precisam de imagem autorizada para salvar.',
+    ],
+  },
+  {
     version: '2.7.0', date: '2026-10-23', title: 'Todas as novidades, sempre pertinho',
     kind: 'Novidades',
     highlights: [
@@ -98,6 +110,8 @@ export const postMigrationHighlights = [
       'Aceites, recusas e confirmações de acordo geram avisos próprios; a resposta do outro nunca é presumida.',
       'Propostas recusadas ou com data vencida ficam no Histórico, sem poluir o Juntos.',
       'Botão Reenviar notificação para lembrar quem ainda não respondeu, sem duplicar a proposta.',
+      'Dream Match em Descobrir, Super Likes individuais, Matches confirmados pelos dois e Histórico separados.',
+      'Locais descobertos pelo Instagram e decoração em Pins do Pinterest, com fotos obrigatórias e recuperação das referências antigas sem imagem.',
     ],
   },
   {
