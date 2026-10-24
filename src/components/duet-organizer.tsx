@@ -14,7 +14,7 @@ import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@
 import { DuetMusic } from '@/components/duet-music';
 import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
-import { DreamPlatformPreview, DreamReferencePhoto } from '@/components/dream-media';
+import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
@@ -111,7 +111,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     data.votes, userId, data.references,
   )[0]);
   useEffect(() => {
-    if (!previewRef || previewRef.image_path || triedPhotos.current.has(previewRef.id)) return;
+    if (!previewRef || hasDreamPhoto(previewRef) || triedPhotos.current.has(previewRef.id)) return;
     triedPhotos.current.add(previewRef.id);
     void getPhoto({ data: { id: previewRef.id } })
       .then(result => { if (result.ok) void cache.invalidateQueries({ queryKey: ['duet', userId] }); })
@@ -192,8 +192,9 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       const added = await importReference({ data: {
         source_url: item.source_url, category, title: item.title.slice(0,160),
         notes: item.description, uploaded_path: attached,
+        preview_url: attached ? null : item.image || null,
       } });
-      toast.success(`${added.title} entrou no Dream Match com foto! ♡`);
+      toast.success(`${added.title} entrou no Dream Match com imagem! ♡`);
       setResults(list => list.filter(ref => ref.source_url !== item.source_url));
       setSearchPhoto(null); setSearchPhotoUrl('');
       await cache.invalidateQueries({ queryKey: ['duet', userId] });
@@ -582,12 +583,10 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
       {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
         <h3 className="text-base font-semibold">{item.title}</h3>
-        {item.image && category !== 'Decoração'
-          ? <img src={item.image} alt={'Prévia pública no Instagram: ' + item.title}
-              className="mx-auto max-h-[310px] w-full rounded-2xl bg-muted object-contain" loading="lazy"/>
-          : <DreamPlatformPreview key={item.source_url} category={category} sourceUrl={item.source_url}/>}
+        <DreamSearchPhoto key={item.source_url} category={category}
+          sourceUrl={item.source_url} image={item.image} title={item.title}/>
         <p className="text-xs text-muted-foreground">{item.description}</p>
-        <p className="text-xs text-muted-foreground">A imagem precisa estar vinculada antes de entrar no swipe.</p>
+        <p className="text-xs text-muted-foreground">{item.image ? 'Foto pública disponível: você já pode salvar e avaliar. Se a prévia não carregar, use uma foto autorizada.' : 'A publicação original pode aparecer pela incorporação oficial. Para guardar no swipe, anexe uma foto autorizada.'}</p>
         <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/60 px-3 text-sm font-medium">
           <Camera size={16}/>
           {searchPhotoUrl === item.source_url && searchPhoto ? 'Foto selecionada ✓' : 'Anexar foto autorizada'}
@@ -601,7 +600,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           </a></Button>
           <Button size="sm" disabled={busy || data.references.some(ref => ref.source_url===item.source_url)}
             onClick={() => void include(item)}>
-            <Plus size={15}/> Salvar com foto
+            <Plus size={15}/> Salvar inspiração
           </Button>
         </div>
       </article>)}
