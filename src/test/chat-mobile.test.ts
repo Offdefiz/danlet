@@ -48,7 +48,7 @@ describe('Native-feeling Duet chat', () => {
   it('keeps a dedicated scrollable list and fixed chat composer in mobile markup', () => {
     const chat = readFileSync('src/components/duet-extras.tsx', 'utf8');
     const css = readFileSync('src/styles.css', 'utf8');
-    expect(chat).not.toContain('scrollIntoView()');
+    expect(chat).not.toMatch(/\\.scrollIntoView\\(/);
     expect(chat).toContain('ref={messagesRef}');
     expect(chat).toContain('scrollChatToBottom(list)');
     expect(chat).toContain('duet-chat-composer');
