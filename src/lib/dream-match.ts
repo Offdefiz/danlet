@@ -20,7 +20,7 @@ export function isDreamSourceUrl(value: string, category: string): boolean {
         || ['instagram.com', 'www.instagram.com'].includes(hostname)
         && /^\/[A-Za-z0-9._]{1,30}\/?$/.test(u.pathname);
     }
-    return ['pinterest.com', 'www.pinterest.com', 'br.pinterest.com', 'pt.pinterest.com'].includes(hostname)
+    return (hostname === 'pinterest.com' || hostname.endsWith('.pinterest.com'))
       && /^\/pin\/\d+\/?$/.test(u.pathname);
   } catch { return false; }
 }
