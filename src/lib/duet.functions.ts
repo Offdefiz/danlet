@@ -5,6 +5,7 @@ import type { Database } from '@/integrations/supabase/types';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { searchWeb, scrapeWebMeta as scrapeMeta, isPublicHttpsUrl } from '@/lib/firecrawl-direct.server';
 import { isDreamSourceUrl, sourceForCategory } from '@/lib/dream-match';
+import { curatedDreamResults, safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 
 export const findReferences = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
