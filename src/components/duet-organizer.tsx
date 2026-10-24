@@ -12,7 +12,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { useDuet } from '@/hooks/use-duet';
 import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@/lib/duet.types';
 import { DuetMusic } from '@/components/duet-music';
-import { findReferences, fetchPhoto, addFromInstagram } from '@/lib/duet.functions';
+import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
+import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
+import { DreamPlatformPreview, DreamReferencePhoto } from '@/components/dream-media';
+import { optimizeDreamPhoto } from '@/lib/dream-photo';
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -30,7 +33,7 @@ import { parseQuestionLink } from '@/lib/weekend-prompts';
 import { parseProposalLink } from '@/lib/juntos-suggestions';
 
 type RecordForm = { id?: string; version?: number; kind: 'goal' | 'task' | 'note' | 'setting'; title: string; body: string; period: string; reference_id?: string | null; done?: boolean };
-type SearchItem = { title: string; description: string; source_url: string };
+type SearchItem = { title: string; description: string; source_url: string; image: string };
 const dateLabel = (s: string) => new Date(s).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
 
 export function DuetOrganizer({ userId }: { userId: string }) {
@@ -41,7 +44,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [state, setState] = useState('');
   const [city, setCity] = useState('');
   const [scenery, setScenery] = useState('');
-  const [history, setHistory] = useState(false);
+  const [dreamSection, setDreamSection] = useState<DreamSection>('discover');
   const [historyFilter, setHistoryFilter] = useState('Minhas escolhas');
   const [period, setPeriod] = useState(periods[0]);
   const [form, setForm] = useState<RecordForm | null>(null);
@@ -61,9 +64,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [swipeDirection, setSwipeDirection] = useState<'left' | 'right'>('right');
   const [refInsta, setRefInsta] = useState('');
   const [refDescription, setRefDescription] = useState('');
+  const [refTitle, setRefTitle] = useState('');
+  const [manualPhoto, setManualPhoto] = useState<File | null>(null);
+  const [searchPhoto, setSearchPhoto] = useState<File | null>(null);
+  const [searchPhotoUrl, setSearchPhotoUrl] = useState('');
   const search = useServerFn(findReferences);
   const getPhoto = useServerFn(fetchPhoto);
-  const addInsta = useServerFn(addFromInstagram);
+  const importReference = useServerFn(importDreamReference);
   const triedPhotos = useRef<Set<string>>(new Set());
   const reducedMotion = useReducedMotion();
   useEffect(() => {
@@ -135,14 +142,21 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       }); if (saved) setForm(null);
     } else if (await mutate(() => supabase.from('records').insert({ ...payload, created_by: userId }))) setForm(null);
   }
-  async function vote(ref: Row<'references_catalog'>, liked: boolean) {
+  async function vote(ref: Row<'references_catalog'>, liked: boolean, superLike = false) {
+    if (!hasDreamPhoto(ref)) { toast.error('Precisamos adicionar uma foto real antes de votar nesta referência.'); setDreamSection('photos'); return; }
     setSwipeDirection(liked ? 'right' : 'left');
     setLocallyVoted(previous => new Set(previous).add(ref.id));
-    const saved = await mutate(() => supabase.from('votes').upsert({ reference_id: ref.id, user_id: userId, liked, updated_at: new Date().toISOString() }));
+    const saved = await mutate(() => supabase.from('votes').upsert({
+      reference_id: ref.id, user_id: userId, liked: liked || superLike,
+      super_liked: superLike, updated_at: new Date().toISOString(),
+    }));
     if (!saved) setLocallyVoted(previous => { const next = new Set(previous); next.delete(ref.id); return next; });
     else if (liked && partnerVote(data?.votes ?? [], ref.id, userId)?.liked) {
       playDuetSound('match', userId);
-      toast.success(`Match! Você e ${partnerName} curtiram ${ref.title}. ♡`);
+      toast.success(`É MATCH! Você e ${partnerName} escolheram ${ref.title}. ♡`);
+    } else if (saved && superLike) {
+      playDuetSound('success', userId);
+      toast.success(`${ref.title} foi para seus Super Likes! ⭐`);
     } else if (saved) playDuetSound(liked ? 'success' : 'question', userId);
   }
   async function sign(record: Row<'records'>) {
@@ -161,16 +175,54 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     catch (err) { setSearchError(err instanceof Error ? err.message : 'Não foi possível pesquisar.'); }
     finally { setBusy(false); }
   }
+  async function uploadDreamPhoto(file: File): Promise<string> {
+    const prepared = await optimizeDreamPhoto(file);
+    const path = `${userId}/dream-${crypto.randomUUID()}.jpg`;
+    const { error } = await supabase.storage.from('duet-photos').upload(path, prepared, {
+      contentType: 'image/jpeg', cacheControl: '3600',
+    });
+    if (error) throw new Error('Falha ao enviar foto: ' + error.message);
+    return path;
+  }
   async function include(item: SearchItem) {
-    if (await mutate(() => supabase.from('references_catalog').insert({ ...item, category, created_by: userId, verification: 'A confirmar' }))) setResults(current => current.filter(r => r.source_url !== item.source_url));
+    setBusy(true);
+    try {
+      const attached = searchPhotoUrl === item.source_url && searchPhoto
+        ? await uploadDreamPhoto(searchPhoto) : null;
+      const added = await importReference({ data: {
+        source_url: item.source_url, category, title: item.title.slice(0,160),
+        notes: item.description, uploaded_path: attached,
+      } });
+      toast.success(`${added.title} entrou no Dream Match com foto! ♡`);
+      setResults(list => list.filter(ref => ref.source_url !== item.source_url));
+      setSearchPhoto(null); setSearchPhotoUrl('');
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível incluir.'); }
+    finally { setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
     e.preventDefault();
-    const handle = refInsta.trim().replace(/^https?:\/\/(www\.)?instagram\.com\//, '').replace(/^@/, '').replace(/\/.*$/, '');
-    if (!/^[A-Za-z0-9._]{1,30}$/.test(handle)) { toast.error('Digite um @ válido, ex.: @villapaolucci'); return; }
+    const raw = refInsta.trim();
+    const url = /^@?[A-Za-z0-9._]{1,30}$/.test(raw) && sourceForCategory(category)==='instagram'
+      ? `https://www.instagram.com/${raw.replace(/^@/,'')}/` : raw;
+    if (!isDreamSourceUrl(url,category)) {
+      toast.error(category === 'Decoração' ? 'Cole o link de um Pin público do Pinterest.' : 'Cole o perfil ou publicação pública do Instagram.');
+      return;
+    }
     setBusy(true);
-    try { const r = await addInsta({ data: { handle, category, notes: refDescription } }); toast.success(`${r.title} adicionado ♡`); await cache.invalidateQueries({ queryKey: ['duet', userId] }); setAddReference(false); setRefInsta(''); setRefDescription(''); }
-    catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível adicionar.'); }
+    try {
+      const attached = manualPhoto ? await uploadDreamPhoto(manualPhoto) : null;
+      const name = refTitle.trim() || (sourceForCategory(category)==='instagram'
+        ? '@' + new URL(url).pathname.split('/').filter(Boolean).pop()
+        : 'Inspiração de decoração · Pinterest');
+      const added = await importReference({ data: {
+        source_url: url, category, title: name.slice(0,160),
+        notes: refDescription, uploaded_path: attached,
+      } });
+      toast.success(`${added.title} salvo com fotografia ♡`);
+      await cache.invalidateQueries({ queryKey: ['duet', userId] });
+      setAddReference(false); setRefInsta(''); setRefTitle(''); setRefDescription(''); setManualPhoto(null);
+    } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível salvar.'); }
     finally { setBusy(false); }
   }
   async function uploadAvatar(file: File) {
@@ -207,14 +259,15 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const notes = data.records.filter(r => r.kind === 'note' && !r.reference_id);
   const complete = goals.filter(g => data.signatures.filter(s => s.record_id === g.id).length === 2).length;
   const refs = data.references.filter(r => r.category === category && (!state || r.state === state) && (!city || r.city === city) && (!scenery || r.scenery === scenery));
-  const pending = rankReferences(refs.filter(r => !(data.votes.some(v => v.reference_id === r.id && v.user_id === userId) || locallyVoted.has(r.id))), data.votes, userId, data.references);
+  const collections = dreamCollections(refs, data.votes, userId);
+  const pending = rankReferences(collections.discovery.filter(ref => !locallyVoted.has(ref.id)), data.votes, userId, data.references);
   const current = pending[0];
-  const historyRefs = refs.filter(r => {
+  const historyRefs = collections.history.filter(r => {
     const my = data.votes.find(v => v.reference_id === r.id && v.user_id === userId);
     const other = partnerVote(data.votes, r.id, userId);
-    if (historyFilter === 'Matches') return isMatch(data.votes, r.id);
     if (historyFilter === 'Descartados') return my?.liked === false;
-    return historyFilter === 'Escolhas do parceiro' ? Boolean(other) : Boolean(my);
+    if (historyFilter === 'Escolhas do parceiro') return Boolean(other);
+    return Boolean(my);
   });
   const edit = (r: Row<'records'>) => setForm({ ...r, kind: r.kind as RecordForm['kind'] });
   const weddingDate = data.records.find(r => r.kind === 'setting' && r.title === 'Data do casamento');
