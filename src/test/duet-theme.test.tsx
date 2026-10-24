@@ -38,7 +38,7 @@ describe('Personal themes stored on each device', () => {
       'pink-glitter', 'metallic-purple', 'aqua-mercury', 'opal-holographic', 'midnight-stardust', 'black-diamond', 'champagne-gold',
     ]);
     const allIds = themeGroups.flatMap(group => group.themeIds);
-    expect(new Set(allIds).size).toBe(13);
+    expect(new Set(allIds).size).toBe(16);
     expect(themes.map(theme => theme.id).sort()).toEqual([...allIds].sort());
     render(<ThemePicker userId={daniel}/>);
     fireEvent.click(screen.getByRole('button', { name: 'Escolher cores do app' }));
