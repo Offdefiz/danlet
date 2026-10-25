@@ -97,7 +97,7 @@ function ActiveSwipeCard({
     }
   };
 
-  return <div className="relative z-20">
+  return <div className="absolute inset-0 z-20">
     <motion.article role="group" aria-roledescription="cartão deslizável"
       aria-label={item.title}
       drag={!disabled && !locked.current}
@@ -160,19 +160,17 @@ function ActiveSwipeCard({
 }
 
 export function DreamSwipeDeck({
-  items, category, disabled = false, onVote, onSkip, onMore,
+  items, category, disabled = false, onChoose, onMore,
 }: {
   items: DreamSwipeItem[];
   category: string;
   disabled?: boolean;
-  onVote: (item: DreamSwipeItem, superLike: boolean) => Promise<boolean>;
-  onSkip: (item: DreamSwipeItem) => void;
+  onChoose: (item: DreamSwipeItem, decision: DreamSwipeDecision) => Promise<boolean>;
   onMore: () => void;
 }) {
   const current = items[0];
   const onDecision = async (decision: DreamSwipeDecision, item: DreamSwipeItem): Promise<boolean> => {
-    if (decision === 'skip') { onSkip(item); return true; }
-    return onVote(item, decision === 'superlike');
+    return onChoose(item, decision);
   };
   if (!current) return <div className="flex min-h-64 flex-col items-center justify-center gap-4 rounded-[28px] border border-border bg-card p-5 text-center">
     <Heart size={31} className="text-primary"/>
