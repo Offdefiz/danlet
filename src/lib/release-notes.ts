@@ -12,6 +12,18 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.5', date: '2026-10-25', title: 'Dream Match — o swipe ganhou vida ♡',
+    kind: 'Novidades',
+    highlights: [
+      'Resultados de qualquer pesquisa no Instagram ou Pinterest aparecem em um baralho de fotografias empilhadas, como no Tinder, dentro do Dream Match.',
+      'Arrastar para a esquerda passa, para a direita curte e para cima dá Super Like; carimbos de decisão acompanham os dedos com física de mola.',
+      'Cards fotográficos com profundidade, brilhos e botões translúcidos liquid glass, pensados para o iPhone.',
+      'Cada gesto salva automaticamente foto original, publicação e escolha no Supabase, inclusive o descarte no Histórico, sem cadastro manual.',
+      'Quando os dois curtem a mesma inspiração, o Duet apresenta uma animação de É MATCH! com corações e estrelas.',
+      'Se uma decisão não salvar, o card volta ao lugar; gestos e botões não permitem envio duplicado e respeitam movimento reduzido.',
+    ],
+  },
+  {
     version: '2.8.4', date: '2026-10-25', title: 'Dream Match pesquisa sozinho',
     kind: 'Melhorias',
     highlights: [
