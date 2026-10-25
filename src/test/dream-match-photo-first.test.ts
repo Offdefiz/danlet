@@ -58,8 +58,10 @@ describe('Restricted social discovery without fake sources', () => {
     const server = readFileSync('src/lib/duet.functions.ts','utf8');
     expect(widget).toContain('https://assets.pinterest.com/js/pinit.js');
     expect(widget).toContain('data-pin-do="embedPin"');
-    expect(server).toContain('site:pinterest.com/pin/');
-    expect(server).toContain('site:instagram.com');
+    const autoSearch = readFileSync('src/lib/dream-auto-search.ts','utf8');
+    expect(autoSearch).toContain('site:pinterest.com/pin/');
+    expect(autoSearch).toContain('site:instagram.com');
+    expect(server).toContain('findAutonomousDreamPhotos');
     expect(server).toContain('upload');
     expect(server).not.toContain('getCuratedWeddingVenues');
   });
