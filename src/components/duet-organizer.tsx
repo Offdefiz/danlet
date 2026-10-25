@@ -14,7 +14,9 @@ import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@
 import { DuetMusic } from '@/components/duet-music';
 import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
-import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
+import { DreamReferencePhoto } from '@/components/dream-media';
+import { DreamSwipeDeck, type DreamSwipeAction } from '@/components/dream-swipe-deck';
+import { DreamMatchCelebration } from '@/components/dream-match-celebration';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
 
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
@@ -55,6 +57,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [online, setOnline] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [results, setResults] = useState<SearchItem[]>([]);
+  const [dreamMatchTitle, setDreamMatchTitle] = useState<string | null>(null);
   const [region, setRegion] = useState('');
   const [searchError, setSearchError] = useState('');
   const [dreamSearchMode, setDreamSearchMode] = useState<'live' | 'curated' | 'unavailable' | null>(null);
@@ -192,8 +195,11 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   }
   /** Choosing a social photograph automatically saves the original post and
    * the person's vote in one interaction. No URL copy, upload or extra step. */
-  async function chooseDiscovered(item: SearchItem, superLike: boolean) {
-    if (!item.image || !data) return;
+  /** A swipe automatically stores the source photo plus the real vote. The
+   * deck only removes a liked card when this returns true, so failed network
+   * operations snap the card back instead of silently losing the choice. */
+  async function chooseDiscovered(item: SearchItem, superLike: boolean): Promise<boolean> {
+    if (!item.image || !data) return false;
     setBusy(true);
     try {
       const existing = data.references.find(ref =>
@@ -214,7 +220,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       await cache.invalidateQueries({ queryKey: ['duet', userId] });
       if (partnerVote(data.votes, saved.id, userId)?.liked) {
         playDuetSound('match', userId);
-        toast.success('É MATCH! Os dois curtiram ' + saved.title + ' ♡');
+        setDreamMatchTitle(saved.title);
       } else if (superLike) {
         playDuetSound('success', userId);
         toast.success(saved.title + ' foi para seus Super Likes! ⭐');
@@ -222,8 +228,10 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         playDuetSound('success', userId);
         toast.success(saved.title + ' foi curtido! ♡');
       }
+      return true;
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Não consegui registrar essa escolha.');
+      return false;
     } finally { setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
@@ -591,6 +599,8 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </>}
     </DialogContent>
   </Dialog>
+  <DreamMatchCelebration title={dreamMatchTitle} partner={partnerName}
+    onClose={() => setDreamMatchTitle(null)}/>
   <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
     <DialogContent aria-label="Busca automática de fotos do Dream Match"
       className="flex h-[min(90dvh,810px)] w-[calc(100vw-20px)] max-w-lg flex-col gap-0 overflow-hidden rounded-[28px] p-0">
@@ -632,29 +642,20 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         {!busy && rankedResults.length > 0 && <p className="text-xs font-semibold text-muted-foreground">
           {rankedResults.length} {rankedResults.length === 1 ? 'publicação encontrada' : 'publicações encontradas'} com fotos
         </p>}
-        {rankedResults.map(item => <article key={item.source_url}
-          className="space-y-3 rounded-[24px] border border-border bg-card p-3 shadow-sm">
-          <DreamSearchPhoto category={category} sourceUrl={item.source_url}
-            image={item.image} title={item.title}/>
-          <div className="space-y-1 px-1">
-            <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
-            {item.description && <p className="text-xs leading-relaxed text-muted-foreground">{item.description}</p>}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl"
-              onClick={() => setResults(list => list.filter(r => r.source_url !== item.source_url))}>
-              <X size={17}/> Passar
-            </Button>
-            <Button size="sm" disabled={busy} className="min-h-12 rounded-2xl"
-              onClick={() => void chooseDiscovered(item, false)}>
-              <Heart size={17}/> Curtir
-            </Button>
-            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl border-amber-400/55 text-amber-500"
-              onClick={() => void chooseDiscovered(item, true)}>
-              <Star size={17} fill="currentColor"/> Super Like
-            </Button>
-          </div>
-        </article>)}
+        {!busy && rankedResults.length > 0 && <DreamSwipeDeck
+          items={rankedResults}
+          category={category}
+          disabled={busy}
+          onDecision={async (item, action: DreamSwipeAction) => {
+            if (action === 'pass') {
+              setResults(previous => previous.filter(result => result.source_url !== item.source_url));
+              playDuetSound('question', userId);
+              return true;
+            }
+            return chooseDiscovered(item, action === 'super');
+          }}
+        />}
+
       </div>
     </DialogContent>
   </Dialog>
