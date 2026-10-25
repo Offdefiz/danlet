@@ -124,7 +124,7 @@ function DreamSwipeFrontCard({ item, category, disabled, onDecision }: {
     initial={reducedMotion ? false : { scale: 0.965, y: 14, opacity: 0 }}
     animate={controls}
     exit={reducedMotion ? { opacity: 0, transition: { duration: 0 } } : { opacity: 0, scale: 0.96, transition: { duration: 0.13 } }}
-    whileTap={disabled || pending ? undefined : { scale: 0.992 }}
+    whileTap={{ scale: disabled || pending ? 1 : 0.992 }}
     drag={disabled || pending ? false : true}
     dragMomentum={false}
     dragElastic={0.85}
