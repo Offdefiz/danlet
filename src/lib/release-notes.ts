@@ -12,6 +12,18 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.5', date: '2026-10-25', title: 'Swipe de verdade, fotos e efeitos',
+    kind: 'Novidades',
+    highlights: [
+      'Fotos encontradas na busca agora entram diretamente num baralho de swipe dentro de Descobrir, em vez de aparecerem numa lista.',
+      'Arraste para a esquerda para passar, para a direita para curtir ou para cima para dar Super Like, com giro e efeito visual de decisão.',
+      'Cartões de fotos em camadas, com brilho de vidro, botões flutuantes e animações suaves no iPhone.',
+      'Passar, curtir e Super Like salvam o voto correspondente no Supabase automaticamente, sem cadastro manual de links ou imagens.',
+      'Se uma gravação falhar, o card volta ao lugar para você tentar novamente sem perder a decisão.',
+      'Quando os dois curtem a mesma publicação, aparece uma celebração de Match com atalho para os Matches do casal.',
+    ],
+  },
+  {
     version: '2.8.4', date: '2026-10-25', title: 'Dream Match pesquisa sozinho',
     kind: 'Melhorias',
     highlights: [

@@ -14,7 +14,8 @@ import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@
 import { DuetMusic } from '@/components/duet-music';
 import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
-import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
+import { DreamReferencePhoto } from '@/components/dream-media';
+import { DreamSwipeDeck, type DreamSwipeDecision } from '@/components/dream-swipe-deck';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
 
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
@@ -55,6 +56,8 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [online, setOnline] = useState(true);
   const [searchOpen, setSearchOpen] = useState(false);
   const [results, setResults] = useState<SearchItem[]>([]);
+  const [searchCategory, setSearchCategory] = useState('Locais');
+  const [matchCelebration, setMatchCelebration] = useState<{ title: string; image: string } | null>(null);
   const [region, setRegion] = useState('');
   const [searchError, setSearchError] = useState('');
   const [dreamSearchMode, setDreamSearchMode] = useState<'live' | 'curated' | 'unavailable' | null>(null);
@@ -94,7 +97,11 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     return () => { window.removeEventListener('online', update); window.removeEventListener('offline', update); };
   }, []);
   const data = query.data;
-  const rankedResults = data ? rankDiscoveredVenues(results, data.references, data.votes) : results;
+  const rankedResults = data && searchCategory === category
+    ? rankDiscoveredVenues(results.filter(item => !data.references.some(ref =>
+        ref.source_url === item.source_url && ref.category === category &&
+        data.votes.some(vote => vote.reference_id === ref.id && vote.user_id === userId),
+      )), data.references, data.votes) : [];
   const me = data?.members.find(m => m.user_id === userId);
   const partner = data?.members.find(m => m.user_id !== userId);
   const partnerName = partner?.person ?? (me?.person === 'Daniel' ? 'Letícia' : 'Daniel');
@@ -170,12 +177,19 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     await mutate(() => supabase.from('records').insert({ kind: 'goal', title: ref.title, body: ref.description, reference_id: ref.id, created_by: userId, updated_by: userId, period: 'Médio Prazo' }));
   }
   async function runSearch() {
+    if (busy) return;
     setBusy(true); setSearchError(''); setDreamSearchMode(null); setResults([]);
     try {
       const found = await search({ data: { category, region: region.trim() } });
       setResults(found.results);
+      setSearchCategory(category);
       setDreamSearchMode(found.mode);
       setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma foto pública encontrada para essa pesquisa.'));
+      if (found.results.length > 0) {
+        setDreamSection('discover');
+        setSearchOpen(false);
+        window.requestAnimationFrame(() => window.scrollTo({ top: 0, behavior: 'smooth' }));
+      }
     } catch {
       setDreamSearchMode('unavailable');
       setSearchError('A pesquisa não pôde ser concluída agora. Tente novamente daqui a pouco.');
@@ -192,9 +206,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   }
   /** Choosing a social photograph automatically saves the original post and
    * the person's vote in one interaction. No URL copy, upload or extra step. */
-  async function chooseDiscovered(item: SearchItem, superLike: boolean) {
-    if (!item.image || !data) return;
-    setBusy(true);
+  /** A gesture is committed only after both the reference (with real photo)
+   * and the account's vote were saved. On failure the card springs back. */
+  async function chooseDiscovered(item: SearchItem, decision: DreamSwipeDecision): Promise<boolean> {
+    if (!item.image || !data || busy) return false;
+    const liked = decision !== 'skip';
+    const superLike = decision === 'superlike';
+    setBusy(true); setSync('Salvando…');
     try {
       const existing = data.references.find(ref =>
         ref.source_url === item.source_url && ref.category === category);
@@ -205,25 +223,31 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           notes: item.description, uploaded_path: null, preview_url: item.image,
         } });
       const { error } = await supabase.from('votes').upsert({
-        reference_id: saved.id, user_id: userId, liked: true,
+        reference_id: saved.id, user_id: userId, liked,
         super_liked: superLike, updated_at: new Date().toISOString(),
       });
       if (error) throw new Error(error.message);
       setResults(previous => previous.filter(result => result.source_url !== item.source_url));
       setLocallyVoted(previous => new Set(previous).add(saved.id));
-      await cache.invalidateQueries({ queryKey: ['duet', userId] });
-      if (partnerVote(data.votes, saved.id, userId)?.liked) {
+      setSync('Salvo');
+      void cache.invalidateQueries({ queryKey: ['duet', userId] });
+      if (liked && partnerVote(data.votes, saved.id, userId)?.liked) {
         playDuetSound('match', userId);
-        toast.success('É MATCH! Os dois curtiram ' + saved.title + ' ♡');
+        setMatchCelebration({ title: saved.title, image: item.image });
       } else if (superLike) {
         playDuetSound('success', userId);
-        toast.success(saved.title + ' foi para seus Super Likes! ⭐');
-      } else {
+        toast.success(saved.title + ' foi para seus Super Likes! ★');
+      } else if (liked) {
         playDuetSound('success', userId);
         toast.success(saved.title + ' foi curtido! ♡');
+      } else {
+        playDuetSound('question', userId);
       }
+      return true;
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Não consegui registrar essa escolha.');
+      setSync('Falha ao salvar');
+      toast.error(error instanceof Error ? error.message : 'A escolha não foi salva. Tente novamente.');
+      return false;
     } finally { setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
@@ -347,16 +371,19 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </div>
       <div className="flex flex-wrap gap-2">{categories.map(item => <Button key={item} size="sm"
         className="rounded-full text-xs" variant={category === item ? 'default' : 'outline'}
-        onClick={() => { setCategory(item); setState(''); setCity(''); setScenery(''); }}>{item}</Button>)}</div>
-      <div className="grid grid-cols-3 gap-2">
+        onClick={() => {
+          setCategory(item); setState(''); setCity(''); setScenery('');
+          if (item !== category) { setResults([]); setDreamSearchMode(null); setSearchError(''); }
+        }}>{item}</Button>)}</div>
+      {rankedResults.length === 0 && <div className="grid grid-cols-3 gap-2">
         <Select label="Estado" value={state} onChange={value => { setState(value); setCity(''); }}
           options={[...new Set(data.references.filter(r => r.category === category).map(r => r.state).filter(Boolean))]}/>
         <Select label="Cidade" value={city} onChange={setCity}
           options={[...new Set(data.references.filter(r => r.category === category && (!state || r.state === state)).map(r => r.city).filter(Boolean))]}/>
         <Select label="Cenário" value={scenery} onChange={setScenery}
           options={[...new Set(refs.map(r => r.scenery).filter(Boolean))]}/>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
+      </div>}
+      {rankedResults.length === 0 && <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
         <span className="text-xs leading-relaxed text-muted-foreground">
           {category === 'Decoração' ? 'Decoração: fotos e Pins do Pinterest' : 'Locais: publicações e perfis do Instagram'}.
           Apenas referências com fotografia entram nas escolhas.
@@ -364,9 +391,25 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <Button variant="outline" size="sm" className="shrink-0 rounded-full" onClick={() => setSearchOpen(true)}>
           <Search size={16}/> Buscar fotos
         </Button>
-      </div>
+      </div>}
       {dreamSection === 'discover' && <section aria-label="Descobrir lugares e decorações com fotos" className="space-y-4">
-        {current ? <>
+        {rankedResults.length > 0 ? <>
+          <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3">
+            <div>
+              <p className="text-xs font-bold text-primary">Resultados da sua pesquisa</p>
+              <p className="mt-0.5 text-sm font-semibold">{region.trim() || 'Inspirações'} · {rankedResults.length} fotos</p>
+            </div>
+            <Button size="sm" variant="outline" className="rounded-full" onClick={() => setSearchOpen(true)}>
+              <Search size={15}/> Nova busca
+            </Button>
+          </div>
+          <DreamSwipeDeck items={rankedResults} category={category} disabled={busy}
+            onChoose={chooseDiscovered} onMore={() => setSearchOpen(true)}/>
+          {current && <Button type="button" variant="ghost" className="w-full rounded-2xl"
+            onClick={() => { setResults([]); setSearchError(''); }}>
+            Voltar às opções salvas no catálogo
+          </Button>}
+        </> : current ? <>
           <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
             <span>{pending.length} {pending.length === 1 ? 'opção com foto' : 'opções com foto'} para avaliar</span>
             <span>{partnerName}: {voteLabel(partnerVote(data.votes,current.id,userId))}</span>
@@ -591,6 +634,42 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       </>}
     </DialogContent>
   </Dialog>
+  <Dialog open={Boolean(matchCelebration)} onOpenChange={open => { if (!open) setMatchCelebration(null); }}>
+    <DialogContent aria-label="Match do casal"
+      className="duet-match-celebration flex w-[calc(100vw-24px)] max-w-md flex-col items-center gap-5 overflow-hidden rounded-[32px] border-primary/40 bg-background p-7 text-center shadow-2xl">
+      <motion.div initial={reducedMotion ? false : { scale: 0.45, rotate: -12, opacity: 0 }}
+        animate={{ scale: 1, rotate: 0, opacity: 1 }}
+        transition={{ type: 'spring', stiffness: 280, damping: 18 }}
+        className="relative mt-3 flex h-28 w-28 items-center justify-center rounded-full bg-gradient-to-br from-pink-500 via-purple-600 to-fuchsia-400 text-white shadow-[0_0_46px_rgba(217,70,239,.45)]">
+        <Heart size={63} strokeWidth={1.4} fill="currentColor"/>
+        <Star size={24} fill="currentColor" className="absolute -right-4 -top-2 text-amber-200"/>
+        <Star size={18} fill="currentColor" className="absolute -bottom-2 -left-4 text-amber-200"/>
+      </motion.div>
+      {matchCelebration?.image && <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-primary/25">
+        <img src={matchCelebration.image} alt={'Foto do nosso Match: ' + matchCelebration.title}
+          className="h-full w-full object-cover" loading="eager"
+          onError={event => { event.currentTarget.style.display = 'none'; }}/>
+        <span className="absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-lg">
+          Uma escolha dos dois ♡
+        </span>
+      </div>}
+      <DialogHeader className="text-center">
+        <DialogTitle className="text-center text-3xl font-black tracking-tight text-primary">É MATCH! ♡</DialogTitle>
+        <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
+          Você e {partnerName} gostaram de <strong className="text-foreground">{matchCelebration?.title}</strong>!
+          Esta inspiração está guardada em Matches.
+        </p>
+      </DialogHeader>
+      <div className="grid w-full gap-2">
+        <Button className="min-h-12 rounded-2xl" onClick={() => { setMatchCelebration(null); setDreamSection('matches'); }}>
+          <Heart size={18}/> Ver nossos Matches
+        </Button>
+        <Button variant="outline" className="min-h-12 rounded-2xl" onClick={() => setMatchCelebration(null)}>
+          Continuar descobrindo
+        </Button>
+      </div>
+    </DialogContent>
+  </Dialog>
   <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
     <DialogContent aria-label="Busca automática de fotos do Dream Match"
       className="flex h-[min(90dvh,810px)] w-[calc(100vw-20px)] max-w-lg flex-col gap-0 overflow-hidden rounded-[28px] p-0">
@@ -629,32 +708,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           variant="outline" className="min-h-12 w-full rounded-2xl" onClick={() => void runSearch()}>
           <Search size={17}/> Tentar novamente
         </Button>}
-        {!busy && rankedResults.length > 0 && <p className="text-xs font-semibold text-muted-foreground">
-          {rankedResults.length} {rankedResults.length === 1 ? 'publicação encontrada' : 'publicações encontradas'} com fotos
-        </p>}
-        {rankedResults.map(item => <article key={item.source_url}
-          className="space-y-3 rounded-[24px] border border-border bg-card p-3 shadow-sm">
-          <DreamSearchPhoto category={category} sourceUrl={item.source_url}
-            image={item.image} title={item.title}/>
-          <div className="space-y-1 px-1">
-            <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
-            {item.description && <p className="text-xs leading-relaxed text-muted-foreground">{item.description}</p>}
-          </div>
-          <div className="grid grid-cols-3 gap-2">
-            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl"
-              onClick={() => setResults(list => list.filter(r => r.source_url !== item.source_url))}>
-              <X size={17}/> Passar
-            </Button>
-            <Button size="sm" disabled={busy} className="min-h-12 rounded-2xl"
-              onClick={() => void chooseDiscovered(item, false)}>
-              <Heart size={17}/> Curtir
-            </Button>
-            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl border-amber-400/55 text-amber-500"
-              onClick={() => void chooseDiscovered(item, true)}>
-              <Star size={17} fill="currentColor"/> Super Like
-            </Button>
-          </div>
-        </article>)}
+        {!busy && rankedResults.length > 0 && <div className="space-y-3 rounded-2xl border border-primary/25 bg-secondary/50 p-4">
+          <p className="text-sm font-semibold">{rankedResults.length} fotos prontas para o swipe.</p>
+          <Button type="button" onClick={() => { setDreamSection('discover'); setSearchOpen(false); }}
+            className="min-h-12 w-full rounded-2xl">
+            <Heart size={17}/> Abrir baralho do Dream Match
+          </Button>
+        </div>}
       </div>
     </DialogContent>
   </Dialog>
