@@ -326,8 +326,8 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <div><p className="text-xs font-semibold uppercase tracking-[.16em] text-muted-foreground">Descobertas a dois</p>
           <h1 className="mt-1 text-3xl font-semibold">Dream Match <span className="text-primary">♡</span></h1>
         </div>
-        <Button variant="outline" size="icon" title="Adicionar referência com foto" aria-label="Adicionar referência com foto"
-          onClick={() => { setManualPhoto(null); setAddReference(true); }}><Plus/></Button>
+        <Button variant="outline" size="icon" title="Pesquisar lugares com fotos" aria-label="Pesquisar lugares com fotos"
+          onClick={() => setSearchOpen(true)}><Search/></Button>
       </div>
       <div role="tablist" aria-label="Seções do Dream Match" className="grid grid-cols-3 gap-2 rounded-[24px] bg-secondary/60 p-1.5 sm:grid-cols-5">
         {([
@@ -560,7 +560,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     <div className="grid gap-2">
       {([{ label: 'Próximo passo', kind: 'task' }, { label: 'Anotação', kind: 'note' }, { label: 'Meta do casal', kind: 'goal' }] as const).map(item => <Button key={item.kind} variant="outline" onClick={() => { setQuickAddOpen(false); newRecord(item.kind); }}><Plus size={16}/>{item.label}</Button>)}
       <Button variant="outline" onClick={() => { setQuickAddOpen(false); setTab('calendar'); }}><CalendarDays size={16}/>Compromisso na agenda</Button>
-      <Button variant="outline" onClick={() => { setQuickAddOpen(false); setCategory('Locais'); setTab('dream'); setAddReference(true); }}><MapPin size={16}/>Local ou referência de casamento</Button>
+      <Button variant="outline" onClick={() => { setQuickAddOpen(false); setCategory('Locais'); setTab('dream'); setSearchOpen(true); }}><MapPin size={16}/>Local ou referência de casamento</Button>
     </div>
   </DialogContent></Dialog>
   <Dialog open={Boolean(form)} onOpenChange={o => { if (!o) setForm(null); }}><DialogContent className="max-h-[85vh] overflow-y-auto"><DialogHeader><DialogTitle>{form?.id ? 'Editar' : 'Adicionar'} {form?.kind === 'goal' ? 'meta' : form?.kind === 'task' ? 'próximo passo' : form?.kind === 'setting' ? 'data do casamento' : 'anotação'}</DialogTitle></DialogHeader>{form && <form onSubmit={saveRecord} className="space-y-4">{form.kind !== 'setting' && <label className="block text-sm">Título<Input required value={form.title} onChange={e => setForm({ ...form,title:e.target.value })} className="mt-2" maxLength={200}/></label>}<label className="block text-sm">{form.kind === 'setting' ? 'Data' : 'Anotações'}{form.kind === 'setting' ? <Input type="date" required value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2"/> : <Textarea value={form.body} onChange={e => setForm({ ...form,body:e.target.value })} className="mt-2 min-h-28" maxLength={10000}/>}</label>{form.kind === 'goal' && <Select label="Prazo" value={form.period} onChange={v => setForm({ ...form,period:v })} options={periods} noAll/>}<Button disabled={busy} className="w-full">{busy ? 'Salvando…' : 'Salvar'}</Button></form>}</DialogContent></Dialog>
@@ -592,63 +592,70 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     </DialogContent>
   </Dialog>
   <Dialog open={searchOpen} onOpenChange={setSearchOpen}>
-    <DialogContent className="max-h-[87dvh] overflow-y-auto rounded-[28px]">
-      <DialogHeader><DialogTitle>Buscar {category === 'Decoração' ? 'no Pinterest' : 'no Instagram'}</DialogTitle></DialogHeader>
-      <p className="text-xs text-muted-foreground">
-        {category === 'Decoração'
-          ? 'Somente Pins públicos do Pinterest. Se a miniatura pública estiver disponível, você já pode salvar. Também pode anexar uma imagem autorizada.'
-          : 'Somente perfis e publicações públicas do Instagram. Quando a rede não disponibiliza uma foto para uso no Duet, você pode anexar uma imagem autorizada.'}
-      </p>
-      <label className="text-sm">{category === 'Decoração' ? 'Estilo, cidade ou tema de decoração' : 'Qualquer cidade, bairro, região ou país'}
-        <Input value={region} onChange={e => setRegion(e.target.value)}
-          placeholder={category === 'Decoração' ? 'Ex.: jardim inglês, iluminação delicada' : 'Ex.: Tiradentes, MG'}
-          className="mt-2" maxLength={100}/>
-      </label>
-      <Button disabled={busy} onClick={runSearch}><Search size={17}/>{busy ? 'Pesquisando…' : 'Pesquisar fotos'}</Button>
-      {searchError && <p role="status" className="text-sm text-muted-foreground">{searchError}</p>}
-      {shouldOfferExternalDreamSearch(dreamSearchMode ?? '', results.length) && <div className="space-y-3 rounded-2xl border border-primary/30 bg-secondary/45 p-4">
-        <p className="text-sm font-semibold">Pesquisar além da lista inicial</p>
+    <DialogContent aria-label="Busca automática de fotos do Dream Match"
+      className="flex h-[min(90dvh,810px)] w-[calc(100vw-20px)] max-w-lg flex-col gap-0 overflow-hidden rounded-[28px] p-0">
+      <div className="shrink-0 space-y-3 border-b border-border bg-card/85 px-4 pb-4 pt-6 pr-12 sm:px-6 sm:pt-6">
+        <DialogHeader className="text-left">
+          <DialogTitle className="text-xl">Descobrir {category === 'Decoração' ? 'no Pinterest' : 'no Instagram'}</DialogTitle>
+        </DialogHeader>
         <p className="text-xs leading-relaxed text-muted-foreground">
-          Não encontrei fotografias públicas disponíveis nesta tentativa, ou a busca gratuita atingiu seu limite.
-          Você ainda pode procurar fotos de qualquer cidade filtradas para {socialSearchSource(category)} e salvar as publicações que gostar.
+          Digite qualquer {category === 'Decoração' ? 'tema, estilo ou lugar' : 'lugar, bairro, cidade ou país'}.
+          O Duet pesquisa publicações públicas e reúne as fotos aqui, sem precisar anexar imagens ou colar links.
         </p>
-        <Button asChild className="w-full rounded-2xl">
-          <a href={socialImageSearchUrl(category, region)} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={17}/> Ver fotos de {region.trim() || 'outras regiões'}
-          </a>
-        </Button>
-        <Button variant="outline" className="w-full rounded-2xl" onClick={() => { setSearchOpen(false); setAddReference(true); }}>
-          <Plus size={17}/> Adicionar publicação encontrada
-        </Button>
-      </div>}
-      <Button asChild variant="outline" className="w-full rounded-2xl">
-        <a href={socialImageSearchUrl(category, region)} target="_blank" rel="noopener noreferrer">
-          <ExternalLink size={16}/> Buscar fotos do {socialSearchSource(category)} em qualquer lugar
-        </a>
-      </Button>
-      {rankedResults.map(item => <article key={item.source_url} className="space-y-3 border-t border-border pt-4">
-        <h3 className="text-base font-semibold">{item.title}</h3>
-        <DreamSearchPhoto key={item.source_url} category={category}
-          sourceUrl={item.source_url} image={item.image} title={item.title}/>
-        <p className="text-xs text-muted-foreground">{item.description}</p>
-        <p className="text-xs text-muted-foreground">{item.image ? 'Foto pública disponível: você já pode salvar e avaliar. Se a prévia não carregar, use uma foto autorizada.' : 'A publicação original pode aparecer pela incorporação oficial. Para guardar no swipe, anexe uma foto autorizada.'}</p>
-        <label className="inline-flex min-h-11 cursor-pointer items-center gap-2 rounded-xl border border-dashed border-primary/60 px-3 text-sm font-medium">
-          <Camera size={16}/>
-          {searchPhotoUrl === item.source_url && searchPhoto ? 'Foto selecionada ✓' : 'Anexar foto autorizada'}
-          <input type="file" accept="image/jpeg,image/png,image/webp" className="sr-only"
-            aria-label={'Anexar foto de ' + item.title}
-            onChange={event => { const photo=event.target.files?.[0]; if (photo) {setSearchPhoto(photo);setSearchPhotoUrl(item.source_url);} event.currentTarget.value=''; }}/>
-        </label>
-        <div className="flex flex-wrap gap-2">
-          <Button asChild variant="outline" size="sm"><a href={item.source_url} target="_blank" rel="noopener noreferrer">
-            <ExternalLink size={14}/> Ver original
-          </a></Button>
-          <Button size="sm" disabled={busy || data.references.some(ref => ref.source_url===item.source_url)}
-            onClick={() => void include(item)}>
-            <Plus size={15}/> Salvar inspiração
+        <form onSubmit={event => { event.preventDefault(); if (!busy) void runSearch(); }} className="flex items-end gap-2">
+          <label className="min-w-0 flex-1 text-sm font-medium">
+            {category === 'Decoração' ? 'O que você deseja decorar?' : 'Onde quer descobrir lugares?'}
+            <Input value={region} onChange={event => setRegion(event.target.value)}
+              placeholder={category === 'Decoração' ? 'Ex.: jardim romântico' : 'Ex.: Paris, França'}
+              className="mt-2 h-12 rounded-2xl" maxLength={100}/>
+          </label>
+          <Button type="submit" disabled={busy} className="h-12 shrink-0 rounded-2xl px-4"
+            aria-label={busy ? 'Pesquisando fotos' : 'Pesquisar fotos'}>
+            <Search size={19}/>
+            <span className="hidden sm:inline">{busy ? 'Buscando…' : 'Pesquisar'}</span>
           </Button>
-        </div>
-      </article>)}
+        </form>
+        <p className="text-[11px] text-muted-foreground">
+          {category === 'Decoração' ? 'Fotos de Pins públicos do Pinterest' : 'Fotos de publicações públicas do Instagram'}
+        </p>
+      </div>
+      <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
+        {busy && <div role="status" className="flex items-center gap-3 rounded-2xl bg-secondary/55 p-4">
+          <Search size={19} className="animate-pulse text-primary"/>
+          <p className="text-sm">Pesquisando publicações, tentando variações e reunindo fotos...</p>
+        </div>}
+        {!busy && searchError && <p role="status" className="rounded-2xl bg-secondary/55 p-4 text-sm text-muted-foreground">{searchError}</p>}
+        {!busy && dreamSearchMode === 'unavailable' && !results.length && <Button
+          variant="outline" className="min-h-12 w-full rounded-2xl" onClick={() => void runSearch()}>
+          <Search size={17}/> Tentar novamente
+        </Button>}
+        {!busy && rankedResults.length > 0 && <p className="text-xs font-semibold text-muted-foreground">
+          {rankedResults.length} {rankedResults.length === 1 ? 'publicação encontrada' : 'publicações encontradas'} com fotos
+        </p>}
+        {rankedResults.map(item => <article key={item.source_url}
+          className="space-y-3 rounded-[24px] border border-border bg-card p-3 shadow-sm">
+          <DreamSearchPhoto category={category} sourceUrl={item.source_url}
+            image={item.image} title={item.title}/>
+          <div className="space-y-1 px-1">
+            <h3 className="text-base font-semibold leading-snug">{item.title}</h3>
+            {item.description && <p className="text-xs leading-relaxed text-muted-foreground">{item.description}</p>}
+          </div>
+          <div className="grid grid-cols-3 gap-2">
+            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl"
+              onClick={() => setResults(list => list.filter(r => r.source_url !== item.source_url))}>
+              <X size={17}/> Passar
+            </Button>
+            <Button size="sm" disabled={busy} className="min-h-12 rounded-2xl"
+              onClick={() => void chooseDiscovered(item, false)}>
+              <Heart size={17}/> Curtir
+            </Button>
+            <Button size="sm" variant="outline" disabled={busy} className="min-h-12 rounded-2xl border-amber-400/55 text-amber-500"
+              onClick={() => void chooseDiscovered(item, true)}>
+              <Star size={17} fill="currentColor"/> Super Like
+            </Button>
+          </div>
+        </article>)}
+      </div>
     </DialogContent>
   </Dialog>
   <Dialog open={addReference} onOpenChange={setAddReference}>
