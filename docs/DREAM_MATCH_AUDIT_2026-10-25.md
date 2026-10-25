@@ -73,3 +73,14 @@ O build também regenerou `routeTree.gen.ts` para incluir a rota de status já e
 - [3DJakob/react-tinder-card](https://github.com/3DJakob/react-tinder-card): referência para limiar de arraste, resposta visual e botões equivalentes ao swipe. A versão consultada, 1.6.4, declara peers React 16/17/18 e spring/web 9.5.5; não foi adicionada ao React 19 do Duet. Nenhum código foi copiado.
 - [motiondivision/motion](https://github.com/motiondivision/motion): gestos, valores de movimento e molas. Foi reutilizado `framer-motion` 14 já presente no projeto, sem aumentar dependências.
 - [Firecrawl: limites oficiais](https://github.com/firecrawl/firecrawl-docs/blob/main/rate-limits.mdx): o modo sem chave tem limites diários por IP e retorna 429 quando excedidos. Nenhum limite numérico diário foi presumido.
+
+
+## Correção 2.8.7: miniatura falhou, mas o post está visível
+
+Uma captura enviada após a publicação mostrou um caso que a barreira da 2.8.6 tratava incorretamente: a imagem direta falhava, a publicação oficial aparecia com foto, mas os votos permaneciam bloqueados e uma segunda camada de título cobria o post.
+
+A correção distingue foto direta de prévia incorporada. O carregamento do script não libera escolhas: um iframe de publicação em host oficial deve emitir load, ou uma imagem Pinterest válida gerada pelo widget deve carregar. Isso libera os botões sem continuar exigindo a miniatura que falhou. Observadores e ouvintes são removidos ao sair do card; publicação atrasada pode recuperar a tela depois do timeout. Não há captura ou inspeção do conteúdo de iframe entre origens: um iframe carregado pode ainda mostrar uma restrição da plataforma, e não é tratado como prova de que todos os pixels da foto foram validados.
+
+O post incorporado não recebe o gradiente nem o título sobreposto do card e preserva seus próprios gestos. A decisão nesse modo usa os botões externos; a foto direta mantém os gestos do swipe. Se nenhuma prévia carregar, há aviso, recarga, link original e pulo sem voto.
+
+Testes de regressão cobrem os três votos após fallback oficial, script sem publicação, iframe não confiável, demora, evento atrasado de card anterior, expiração do timer antigo e mídia Pinterest. Um teste local em Chromium reproduz o fluxo com miniatura HTML e publicação incorporada simulada; isso não substitui teste real autenticado no Safari do usuário.

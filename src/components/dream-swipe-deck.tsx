@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { animate, motion, useAnimationControls, useMotionValue, useReducedMotion, useTransform } from 'framer-motion';
 import { ArrowUp, ExternalLink, Heart, Instagram, Star, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -32,33 +32,41 @@ export function getDreamSwipeExit(decision: DreamSwipeDecision, width = 380) {
     rotation: decision === 'like' ? 20 : -20 };
 }
 
-function SwipeMedia({ item, category, onAvailabilityChange }: {
-  item: DreamSwipeItem; category: string; onAvailabilityChange: (ready: boolean) => void;
+type SwipeMediaState = 'loading' | 'photo' | 'embed-loading' | 'embed-ready' | 'unavailable';
+function SwipeMedia({ item, category, onMediaStateChange }: {
+  item: DreamSwipeItem; category: string; onMediaStateChange: (state: SwipeMediaState) => void;
 }) {
   const [broken, setBroken] = useState(false);
   const [attempt, setAttempt] = useState(0);
+  const [embedStatus, setEmbedStatus] = useState<'loading' | 'ready' | 'unavailable'>('loading');
   const photo = useRef<HTMLImageElement>(null);
   const loaded = useRef(false);
+  const onEmbedStatus = useCallback((status: 'loading' | 'ready' | 'unavailable') => {
+    setEmbedStatus(status);
+    onMediaStateChange(status === 'ready' ? 'embed-ready' : status === 'loading' ? 'embed-loading' : 'unavailable');
+  }, [onMediaStateChange]);
   useEffect(() => {
+    if (!safeSocialPreviewUrl(item.image, category)) { setBroken(true); return; }
     const cached = Boolean(photo.current?.complete && photo.current.naturalWidth > 0);
     loaded.current = cached;
-    onAvailabilityChange(cached); setBroken(false);
-    const timer = window.setTimeout(() => {
-      if (!loaded.current) { setBroken(true); onAvailabilityChange(false); }
-    }, 12000);
+    onMediaStateChange(cached ? 'photo' : 'loading'); setBroken(false);
+    const timer = window.setTimeout(() => { if (!loaded.current) setBroken(true); }, 12000);
     return () => window.clearTimeout(timer);
-  }, [item.image, item.source_url, attempt, onAvailabilityChange]);
+  }, [item.image, item.source_url, category, attempt, onMediaStateChange]);
   if (broken || !safeSocialPreviewUrl(item.image, category)) {
-    return <div className="absolute inset-0 overflow-auto rounded-[28px] bg-card p-4 text-foreground">
-      <p role="status" className="mb-3 text-sm">Foto indisponível nesta tentativa. A publicação original pode exigir acesso à plataforma.</p>
-      <Button type="button" variant="outline" className="mb-3 rounded-full" onClick={() => { setBroken(false); setAttempt(value => value + 1); }}>Recarregar foto</Button>
-      <DreamPlatformPreview category={category} sourceUrl={item.source_url}/>
+    return <div className="dream-swipe-embed absolute inset-0 overflow-y-auto overscroll-contain rounded-[28px] bg-card p-2 text-foreground">
+      <p role="status" className="px-2 py-2 text-xs text-muted-foreground">{embedStatus === 'ready'
+        ? 'Prévia da publicação original. Use os botões abaixo para escolher.'
+        : embedStatus === 'loading' ? 'Abrindo publicação original…'
+        : 'A publicação não carregou aqui. Você pode abrir a origem ou pular sem votar.'}</p>
+      <DreamPlatformPreview key={attempt} category={category} sourceUrl={item.source_url} onStatusChange={onEmbedStatus}/>
+      <Button type="button" variant="ghost" className="mt-2 rounded-full" onClick={() => { setEmbedStatus('loading'); setBroken(false); setAttempt(value => value + 1); }}>Recarregar foto</Button>
     </div>;
   }
   return <img ref={photo} src={item.image} alt={item.title} draggable={false}
     loading="eager" decoding="async"
-    onLoad={() => { loaded.current = true; onAvailabilityChange(true); }}
-    onError={() => { setBroken(true); onAvailabilityChange(false); }}
+    onLoad={() => { loaded.current = true; onMediaStateChange('photo'); }}
+    onError={() => { setBroken(true); }}
     className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"/>;
 }
 
@@ -71,7 +79,9 @@ function ActiveSwipeCard({
   onSkipUnavailable: () => void;
   onDecision: (decision: DreamSwipeDecision, item: DreamSwipeItem) => Promise<boolean>;
 }) {
-  const [ready, setReady] = useState(false);
+  const [mediaState, setMediaState] = useState<SwipeMediaState>('loading');
+  const ready = mediaState === 'photo' || mediaState === 'embed-ready';
+  const embedded = !['loading', 'photo'].includes(mediaState);
   const [choosing, setChoosing] = useState(false);
   const disabled = externalDisabled || !ready || choosing;
   const x = useMotionValue(0);
@@ -120,20 +130,20 @@ function ActiveSwipeCard({
 
   return <div className="absolute inset-0 z-20">
     <motion.article role="group" aria-roledescription="cartão deslizável"
-      aria-label={item.title}
-      drag={!disabled && !locked.current}
+      aria-label={item.title} data-media-state={mediaState}
+      drag={!disabled && !locked.current && !embedded}
       dragDirectionLock={false} dragElastic={0.75} dragMomentum={false}
       dragConstraints={{ left: 0, right: 0, top: 0, bottom: 0 }}
       onDragEnd={(_, info) => {
         const decision = classifyDreamGesture(info.offset, info.velocity);
         if (decision) void decide(decision);
       }}
-      style={{ x, y, rotate, touchAction: ready ? 'none' : 'pan-y' }}
+      style={{ x, y, rotate, touchAction: ready && !embedded ? 'none' : 'pan-y' }}
       animate={controls}
       className="dream-swipe-card absolute inset-0 cursor-grab overflow-hidden rounded-[30px] border border-white/25 bg-card shadow-2xl active:cursor-grabbing"
     >
-      <SwipeMedia item={item} category={category} onAvailabilityChange={setReady}/>
-      <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent via-40% to-black/90"/>
+      <SwipeMedia item={item} category={category} onMediaStateChange={setMediaState}/>
+      {!embedded && <><div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent via-40% to-black/90"/>
       <motion.div aria-hidden="true" style={{ opacity: skipOpacity }}
         className="pointer-events-none absolute left-5 top-8 -rotate-12 rounded-xl border-[3px] border-rose-400 bg-black/35 px-4 py-2 text-3xl font-black tracking-wide text-rose-300">
         PASSAR
@@ -153,7 +163,7 @@ function ActiveSwipeCard({
         </span>
         <h3 className="line-clamp-2 text-[24px] font-bold leading-tight drop-shadow-lg">{item.title}</h3>
         {item.description && <p className="line-clamp-2 text-xs leading-relaxed text-white/85">{item.description}</p>}
-      </div>
+      </div></>}
     </motion.article>
     <div className="pointer-events-none absolute inset-0 z-30" aria-hidden="true"/>
     {/* The touch surface is the photo; external links and actions live below it. */}
@@ -178,7 +188,7 @@ function ActiveSwipeCard({
       </Button>
     </div>
     {!ready && <div className="absolute inset-x-0 top-full z-30 mt-24 text-center">
-      <Button type="button" variant="ghost" className="min-h-11 rounded-full" disabled={externalDisabled || choosing} onClick={onSkipUnavailable}>Pular foto indisponível sem votar</Button>
+      <Button type="button" variant="ghost" className="min-h-11 rounded-full" disabled={externalDisabled || choosing} onClick={onSkipUnavailable}>Pular publicação sem votar</Button>
     </div>}
   </div>;
 }
