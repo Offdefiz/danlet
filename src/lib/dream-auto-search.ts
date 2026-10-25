@@ -1,3 +1,4 @@
+import { DreamSearchError, type DreamSearchIssue } from '@/lib/dream-search-status';
 import { isDreamSourceUrl, sourceForCategory } from '@/lib/dream-match';
 import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 import type { SearchHit } from '@/lib/firecrawl-direct.server';
@@ -67,18 +68,20 @@ export async function findAutonomousDreamPhotos(args: {
   search: SearchFn;
   enrich?: EnrichFn;
   minimumPhotos?: number;
-}): Promise<{ results: DreamPhotoResult[]; searches: number; blocked: boolean }> {
+}): Promise<{ results: DreamPhotoResult[]; searches: number; blocked: boolean; issue: DreamSearchIssue | null; retryAfterSeconds: number }> {
   const place = normalizePlace(args.place);
   const queries = dreamPhotoQueries(args.category, place);
   const desired = args.minimumPhotos ?? 5;
   const all = new Map<string, DreamPhotoResult>();
   let searches = 0;
   let blocked = false;
+  let issue: DreamSearchIssue | null = null;
+  let retryAfterSeconds = 0;
   let scrapeBudget = 2;
   for (const query of queries) {
     try {
-      const hits = await args.search(query, 12);
       searches++;
+      const hits = await args.search(query, 10);
       // Process images first so text-only profiles never consume gallery slots.
       const candidates = [...hits].sort((a, b) =>
         Number(Boolean(b.image)) - Number(Boolean(a.image)));
@@ -92,7 +95,12 @@ export async function findAutonomousDreamPhotos(args: {
           try {
             const metaImage = await args.enrich(hit.url);
             if (safeSocialPreviewUrl(metaImage, args.category)) image = metaImage;
-          } catch { /* public post blocks metadata: do not invent photos */ }
+          } catch (error) {
+            if (error instanceof DreamSearchError && ['rate_limited', 'unauthorized'].includes(error.code)) {
+              blocked = true; issue = error.code; retryAfterSeconds = error.retryAfterSeconds;
+              scrapeBudget = 0;
+            }
+          }
         }
         if (!image) continue;
         all.set(key, {
@@ -102,15 +110,18 @@ export async function findAutonomousDreamPhotos(args: {
           image,
         });
       }
-      if (all.size >= desired) break;
-    } catch {
+      if (all.size >= desired || issue === 'rate_limited' || issue === 'unauthorized') break;
+    } catch (error) {
       blocked = true;
-      // Try the next variant automatically. Keyless plans can be rate-limited.
+      issue = error instanceof DreamSearchError ? error.code : 'provider_error';
+      retryAfterSeconds = error instanceof DreamSearchError ? error.retryAfterSeconds : 0;
+      // A different query cannot fix shared quota or credentials. Keep partial photos.
+      if (issue === 'rate_limited' || issue === 'unauthorized') break;
     }
   }
   return {
     results: distinctDreamPhotoResults([...all.values()], args.category).slice(0, 18),
     searches,
-    blocked,
+    blocked, issue, retryAfterSeconds,
   };
 }

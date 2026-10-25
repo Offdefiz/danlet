@@ -1,3 +1,4 @@
+import { DreamSearchError } from '@/lib/dream-search-status';
 /** Direct Firecrawl API: no Lovable connector, tokens or platform gateway. */
 const API = 'https://api.firecrawl.dev/v2';
 // Public search queries only; each cache hit avoids a billable Firecrawl search.
@@ -35,11 +36,21 @@ async function api(path: '/search' | '/scrape', data: object): Promise<unknown> 
       body: JSON.stringify(data),
     });
     if (!response.ok) {
-      if (response.status === 429) throw new Error('A busca gratuita atingiu o limite temporário. Tente mais tarde ou consulte as publicações na rede social.');
-      if (response.status === 403 || response.status === 401) throw new Error('A pesquisa automática está temporariamente indisponível neste servidor.');
-      throw new Error('Não foi possível completar a pesquisa agora.');
+      if (response.status === 429) {
+        const retry = response.headers?.get('retry-after');
+        const seconds = retry && /^\d+$/.test(retry) ? Number(retry)
+          : retry ? Math.ceil((Date.parse(retry) - Date.now()) / 1000) : 60;
+        throw new DreamSearchError('rate_limited', Number.isFinite(seconds) ? Math.max(1, Math.min(seconds, 86400)) : 60);
+      }
+      if (response.status === 403 || response.status === 401) throw new DreamSearchError('unauthorized');
+      throw new DreamSearchError('provider_error');
     }
-    return response.json();
+    const payload = await response.json();
+    if (!payload || payload.success === false || !payload.data) throw new DreamSearchError('provider_error');
+    return payload;
+  } catch (error) {
+    if (error instanceof DreamSearchError) throw error;
+    throw new DreamSearchError(controller.signal.aborted ? 'timeout' : 'provider_error');
   } finally { clearTimeout(timer); }
 }
 export async function searchWeb(query: string, limit = 8): Promise<SearchHit[]> {

@@ -116,21 +116,37 @@ export function DreamReferencePhoto({
 
 /** Public original-hosted image, with an official embed if hotlinking fails.
  * There is always an attribution and a link to the publication. */
-export function DreamSearchPhoto({ image, sourceUrl, category, title }: {
+export function DreamSearchPhoto({ image, sourceUrl, category, title, swipe = false, onAvailabilityChange }: {
   image: string; sourceUrl: string; category: string; title: string;
+  swipe?: boolean; onAvailabilityChange?: (ready: boolean) => void;
 }) {
   const [failed, setFailed] = useState(false);
-  useEffect(() => setFailed(false), [image, sourceUrl]);
+  const [ready, setReady] = useState(false);
+  const loaded = useRef(false);
+  const photoRef = useRef<HTMLImageElement>(null);
+  useEffect(() => {
+    const cached = Boolean(photoRef.current?.complete && photoRef.current.naturalWidth > 0);
+    loaded.current = cached;
+    setFailed(false); setReady(cached); onAvailabilityChange?.(cached);
+    const timer = window.setTimeout(() => { if (!loaded.current) setFailed(true); }, 12000);
+    return () => window.clearTimeout(timer);
+  }, [image, sourceUrl, onAvailabilityChange]);
+  useEffect(() => { onAvailabilityChange?.(ready && !failed); }, [ready, failed, onAvailabilityChange]);
   const useImage = !failed && safeSocialPreviewUrl(image, category);
+  const photo = <div className={swipe ? 'relative w-full aspect-[4/5] max-h-[44dvh] overflow-hidden rounded-[20px] bg-muted' : 'overflow-hidden rounded-[20px] bg-muted'}>
+    {!ready && <div role="status" className="absolute inset-0 flex animate-pulse items-center justify-center text-xs text-muted-foreground">Carregando fotografia…</div>}
+    <img ref={photoRef} src={image} alt={'Foto real da publicação: ' + title} loading={swipe ? 'eager' : 'lazy'} decoding="async" draggable={false}
+      className={swipe ? 'h-full w-full object-cover' : 'max-h-[360px] w-full object-contain'}
+      onLoad={() => { loaded.current = true; setReady(true); }} onError={() => setFailed(true)}/>
+  </div>;
   return <div className="space-y-1">
-    {useImage
-      ? <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="block overflow-hidden rounded-[20px] bg-muted">
-          <img src={image} alt={'Foto real da publicação: ' + title} loading="lazy" decoding="async"
-            className="max-h-[360px] w-full object-contain" onError={() => setFailed(true)}/>
-        </a>
-      : <DreamPlatformPreview sourceUrl={sourceUrl} category={category}/>}
+    {useImage ? swipe ? photo : <a href={sourceUrl} target="_blank" rel="noopener noreferrer" className="block">{photo}</a>
+      : <div className="space-y-2">
+          <p role="status" className="rounded-xl bg-secondary/60 p-3 text-xs text-muted-foreground">Foto indisponível nesta tentativa. A publicação original pode exigir acesso à plataforma.</p>
+          <DreamPlatformPreview sourceUrl={sourceUrl} category={category}/>
+        </div>}
     <p className="text-[11px] text-muted-foreground">
-      Prévia pública de {sourceForCategory(category) === 'instagram' ? 'Instagram' : 'Pinterest'} · <a className="underline" href={sourceUrl} target="_blank" rel="noopener noreferrer">Ver imagem na origem</a>
+      Prévia pública de {sourceForCategory(category) === 'instagram' ? 'Instagram' : 'Pinterest'}{!swipe && <> · <a className="underline" href={sourceUrl} target="_blank" rel="noopener noreferrer">Ver imagem na origem</a></>}
     </p>
   </div>;
 }

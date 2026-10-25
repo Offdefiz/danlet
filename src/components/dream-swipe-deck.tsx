@@ -32,36 +32,57 @@ export function getDreamSwipeExit(decision: DreamSwipeDecision, width = 380) {
     rotation: decision === 'like' ? 20 : -20 };
 }
 
-function SwipeMedia({ item, category }: { item: DreamSwipeItem; category: string }) {
+function SwipeMedia({ item, category, onAvailabilityChange }: {
+  item: DreamSwipeItem; category: string; onAvailabilityChange: (ready: boolean) => void;
+}) {
   const [broken, setBroken] = useState(false);
-  useEffect(() => setBroken(false), [item.image, item.source_url]);
+  const [attempt, setAttempt] = useState(0);
+  const photo = useRef<HTMLImageElement>(null);
+  const loaded = useRef(false);
+  useEffect(() => {
+    const cached = Boolean(photo.current?.complete && photo.current.naturalWidth > 0);
+    loaded.current = cached;
+    onAvailabilityChange(cached); setBroken(false);
+    const timer = window.setTimeout(() => {
+      if (!loaded.current) { setBroken(true); onAvailabilityChange(false); }
+    }, 12000);
+    return () => window.clearTimeout(timer);
+  }, [item.image, item.source_url, attempt, onAvailabilityChange]);
   if (broken || !safeSocialPreviewUrl(item.image, category)) {
-    return <div className="absolute inset-0 overflow-auto rounded-[28px] bg-card p-4">
+    return <div className="absolute inset-0 overflow-auto rounded-[28px] bg-card p-4 text-foreground">
+      <p role="status" className="mb-3 text-sm">Foto indisponível nesta tentativa. A publicação original pode exigir acesso à plataforma.</p>
+      <Button type="button" variant="outline" className="mb-3 rounded-full" onClick={() => { setBroken(false); setAttempt(value => value + 1); }}>Recarregar foto</Button>
       <DreamPlatformPreview category={category} sourceUrl={item.source_url}/>
     </div>;
   }
-  return <img src={item.image} alt={item.title} draggable={false}
-    loading="eager" decoding="async" onError={() => setBroken(true)}
+  return <img ref={photo} src={item.image} alt={item.title} draggable={false}
+    loading="eager" decoding="async"
+    onLoad={() => { loaded.current = true; onAvailabilityChange(true); }}
+    onError={() => { setBroken(true); onAvailabilityChange(false); }}
     className="pointer-events-none absolute inset-0 h-full w-full select-none object-cover"/>;
 }
 
 function ActiveSwipeCard({
-  item, category, disabled, onDecision,
+  item, category, disabled: externalDisabled, onDecision, onSkipUnavailable,
 }: {
   item: DreamSwipeItem;
   category: string;
   disabled: boolean;
+  onSkipUnavailable: () => void;
   onDecision: (decision: DreamSwipeDecision, item: DreamSwipeItem) => Promise<boolean>;
 }) {
+  const [ready, setReady] = useState(false);
+  const [choosing, setChoosing] = useState(false);
+  const disabled = externalDisabled || !ready || choosing;
   const x = useMotionValue(0);
   const y = useMotionValue(0);
-  const rotate = useTransform(x, [-260, 0, 260], [-17, 0, 17]);
+  const reducedMotion = useReducedMotion();
+  const rotate = useTransform(x, [-260, 0, 260], reducedMotion ? [0, 0, 0] : [-17, 0, 17]);
   const likeOpacity = useTransform(x, [30, 150], [0, 1]);
   const skipOpacity = useTransform(x, [-150, -30], [1, 0]);
   const superOpacity = useTransform(y, [-160, -35], [1, 0]);
   const controls = useAnimationControls();
   const locked = useRef(false);
-  const reducedMotion = useReducedMotion();
 
   const reset = async () => {
     if (reducedMotion) {
@@ -73,12 +94,12 @@ function ActiveSwipeCard({
       ]);
       controls.set({ opacity: 1 });
     }
-    locked.current = false;
+    locked.current = false; setChoosing(false);
   };
 
   const decide = async (decision: DreamSwipeDecision) => {
     if (locked.current || disabled) return;
-    locked.current = true;
+    locked.current = true; setChoosing(true);
     const exit = getDreamSwipeExit(decision, typeof window === 'undefined' ? 380 : window.innerWidth);
     if (!reducedMotion) {
       // Exit off-screen BEFORE advancing the underlying stack. Buttons and
@@ -107,11 +128,11 @@ function ActiveSwipeCard({
         const decision = classifyDreamGesture(info.offset, info.velocity);
         if (decision) void decide(decision);
       }}
-      style={{ x, y, rotate, touchAction: 'none' }}
+      style={{ x, y, rotate, touchAction: ready ? 'none' : 'pan-y' }}
       animate={controls}
       className="dream-swipe-card absolute inset-0 cursor-grab overflow-hidden rounded-[30px] border border-white/25 bg-card shadow-2xl active:cursor-grabbing"
     >
-      <SwipeMedia item={item} category={category}/>
+      <SwipeMedia item={item} category={category} onAvailabilityChange={setReady}/>
       <div className="pointer-events-none absolute inset-0 bg-gradient-to-b from-black/25 via-transparent via-40% to-black/90"/>
       <motion.div aria-hidden="true" style={{ opacity: skipOpacity }}
         className="pointer-events-none absolute left-5 top-8 -rotate-12 rounded-xl border-[3px] border-rose-400 bg-black/35 px-4 py-2 text-3xl font-black tracking-wide text-rose-300">
@@ -156,17 +177,21 @@ function ActiveSwipeCard({
         <Heart size={29} fill="currentColor"/>
       </Button>
     </div>
+    {!ready && <div className="absolute inset-x-0 top-full z-30 mt-24 text-center">
+      <Button type="button" variant="ghost" className="min-h-11 rounded-full" disabled={externalDisabled || choosing} onClick={onSkipUnavailable}>Pular foto indisponível sem votar</Button>
+    </div>}
   </div>;
 }
 
 export function DreamSwipeDeck({
-  items, category, disabled = false, onChoose, onMore,
+  items, category, disabled = false, onChoose, onMore, onSkipUnavailable,
 }: {
   items: DreamSwipeItem[];
   category: string;
   disabled?: boolean;
   onChoose: (item: DreamSwipeItem, decision: DreamSwipeDecision) => Promise<boolean>;
   onMore: () => void;
+  onSkipUnavailable: (item: DreamSwipeItem) => void;
 }) {
   const current = items[0];
   const onDecision = async (decision: DreamSwipeDecision, item: DreamSwipeItem): Promise<boolean> => {
@@ -188,15 +213,12 @@ export function DreamSwipeDeck({
         aria-hidden="true"
         className="dream-swipe-card absolute inset-0 overflow-hidden rounded-[30px] border border-white/10 bg-secondary shadow-lg"
         style={{ transform: `translateY(${(i + 1) * 8}px) scale(${1 - (i + 1) * 0.047})`, opacity: 1 - i * 0.16 }}>
-        {safeSocialPreviewUrl(item.image, category) && <img src={item.image} alt=""
-          draggable={false} decoding="async" loading="lazy"
-          className="h-full w-full object-cover"/>}
         <div className="absolute inset-0 bg-black/25"/>
       </div>)}
       <ActiveSwipeCard key={current.source_url} item={current} category={category}
-        disabled={disabled} onDecision={onDecision}/>
+        disabled={disabled} onDecision={onDecision} onSkipUnavailable={() => onSkipUnavailable(current)}/>
     </div>
-    <div className="h-[74px]" aria-hidden="true"/>
+    <div className="h-[130px]" aria-hidden="true"/>
     <div className="flex flex-wrap items-center justify-center gap-x-2 gap-y-3 text-center text-[11px] text-muted-foreground">
       <span>← Passar</span><span className="text-border">•</span>
       <span><ArrowUp size={13} className="inline text-sky-400"/> Super Like</span>

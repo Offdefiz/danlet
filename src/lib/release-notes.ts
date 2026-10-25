@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.6', date: '2026-10-25', title: 'Fotos disponíveis e busca mais confiável',
+    kind: 'Correções',
+    highlights: [
+      'O swipe só libera votos depois que a fotografia carrega, inclusive quando ela já está no cache do navegador.',
+      'Fotos indisponíveis podem ser recarregadas ou puladas sem voto, com aviso e acesso à publicação original.',
+      'Limites de busca interrompem as tentativas automáticas, preservam fotos já encontradas e informam o tempo de espera quando disponível.',
+      'A pesquisa distingue ausência de fotos de falhas do serviço e oferece uma consulta externa opcional, mantendo a localidade escolhida.',
+      'O baralho e a celebração de Match da versão anterior foram preservados, com proteção adicional contra escolhas duplicadas.',
+    ],
+  },
+  {
     version: '2.8.5', date: '2026-10-25', title: 'Swipe de verdade, fotos e efeitos',
     kind: 'Novidades',
     highlights: [

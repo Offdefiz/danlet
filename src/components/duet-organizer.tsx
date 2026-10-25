@@ -14,6 +14,7 @@ import { categories, periods, isMatch, partnerVote, type Row, type Tab } from '@
 import { DuetMusic } from '@/components/duet-music';
 import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.functions';
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
+import { socialImageSearchUrl } from '@/lib/dream-anywhere';
 import { DreamReferencePhoto } from '@/components/dream-media';
 import { DreamSwipeDeck, type DreamSwipeDecision } from '@/components/dream-swipe-deck';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
@@ -58,6 +59,17 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [results, setResults] = useState<SearchItem[]>([]);
   const [searchCategory, setSearchCategory] = useState('Locais');
   const [matchCelebration, setMatchCelebration] = useState<{ title: string; image: string } | null>(null);
+  const discoverySaving = useRef(false);
+  const [searchedRegion, setSearchedRegion] = useState('');
+  const [retryAt, setRetryAt] = useState(0);
+  const [retrySeconds, setRetrySeconds] = useState(0);
+  useEffect(() => {
+    const update = () => setRetrySeconds(Math.max(0, Math.ceil((retryAt - Date.now()) / 1000)));
+    update();
+    if (!retryAt) return;
+    const timer = window.setInterval(update, 1000);
+    return () => window.clearInterval(timer);
+  }, [retryAt]);
   const [region, setRegion] = useState('');
   const [searchError, setSearchError] = useState('');
   const [dreamSearchMode, setDreamSearchMode] = useState<'live' | 'curated' | 'unavailable' | null>(null);
@@ -177,11 +189,13 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     await mutate(() => supabase.from('records').insert({ kind: 'goal', title: ref.title, body: ref.description, reference_id: ref.id, created_by: userId, updated_by: userId, period: 'Médio Prazo' }));
   }
   async function runSearch() {
-    if (busy) return;
+    if (busy || Date.now() < retryAt) return;
+    setSearchedRegion(region.trim());
     setBusy(true); setSearchError(''); setDreamSearchMode(null); setResults([]);
     try {
       const found = await search({ data: { category, region: region.trim() } });
       setResults(found.results);
+      setRetryAt(found.retryAfterSeconds ? Date.now() + found.retryAfterSeconds * 1000 : 0);
       setSearchCategory(category);
       setDreamSearchMode(found.mode);
       setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma foto pública encontrada para essa pesquisa.'));
@@ -209,7 +223,9 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   /** A gesture is committed only after both the reference (with real photo)
    * and the account's vote were saved. On failure the card springs back. */
   async function chooseDiscovered(item: SearchItem, decision: DreamSwipeDecision): Promise<boolean> {
-    if (!item.image || !data || busy) return false;
+    if (!item.image || !data || busy || discoverySaving.current) return false;
+    if (!navigator.onLine) { toast.error('Sem conexão. Sua escolha ainda não foi salva.'); return false; }
+    discoverySaving.current = true;
     const liked = decision !== 'skip';
     const superLike = decision === 'superlike';
     setBusy(true); setSync('Salvando…');
@@ -248,7 +264,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       setSync('Falha ao salvar');
       toast.error(error instanceof Error ? error.message : 'A escolha não foi salva. Tente novamente.');
       return false;
-    } finally { setBusy(false); }
+    } finally { discoverySaving.current = false; setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
     e.preventDefault();
@@ -369,7 +385,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           <span className="mt-1 inline-block rounded-full bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">{section.count}</span>
         </button>)}
       </div>
-      <div className="flex flex-wrap gap-2">{categories.map(item => <Button key={item} size="sm"
+      <div className="flex flex-wrap gap-2">{categories.map(item => <Button key={item} size="sm" disabled={busy}
         className="rounded-full text-xs" variant={category === item ? 'default' : 'outline'}
         onClick={() => {
           setCategory(item); setState(''); setCity(''); setScenery('');
@@ -397,14 +413,16 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3">
             <div>
               <p className="text-xs font-bold text-primary">Resultados da sua pesquisa</p>
-              <p className="mt-0.5 text-sm font-semibold">{region.trim() || 'Inspirações'} · {rankedResults.length} fotos</p>
+              <p className="mt-0.5 text-sm font-semibold">{searchedRegion || 'Inspirações'} · {rankedResults.length} fotos</p>
             </div>
             <Button size="sm" variant="outline" className="rounded-full" onClick={() => setSearchOpen(true)}>
               <Search size={15}/> Nova busca
             </Button>
           </div>
+          {searchError && <p role="status" className="rounded-2xl bg-secondary/55 p-4 text-sm text-muted-foreground">{searchError}</p>}
+          {retrySeconds > 0 && <p role="status" className="text-xs text-muted-foreground">Você poderá tentar novamente em {retrySeconds}s. O limite do serviço pode durar mais.</p>}
           <DreamSwipeDeck items={rankedResults} category={category} disabled={busy}
-            onChoose={chooseDiscovered} onMore={() => setSearchOpen(true)}/>
+            onChoose={chooseDiscovered} onSkipUnavailable={item => setResults(list => list.filter(result => result.source_url !== item.source_url))} onMore={() => setSearchOpen(true)}/>
           {current && <Button type="button" variant="ghost" className="w-full rounded-2xl"
             onClick={() => { setResults([]); setSearchError(''); }}>
             Voltar às opções salvas no catálogo
@@ -681,14 +699,14 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           Digite qualquer {category === 'Decoração' ? 'tema, estilo ou lugar' : 'lugar, bairro, cidade ou país'}.
           O Duet pesquisa publicações públicas e reúne as fotos aqui, sem precisar anexar imagens ou colar links.
         </p>
-        <form onSubmit={event => { event.preventDefault(); if (!busy) void runSearch(); }} className="flex items-end gap-2">
+        <form onSubmit={event => { event.preventDefault(); if (!busy && !retrySeconds) void runSearch(); }} className="flex items-end gap-2">
           <label className="min-w-0 flex-1 text-sm font-medium">
             {category === 'Decoração' ? 'O que você deseja decorar?' : 'Onde quer descobrir lugares?'}
-            <Input value={region} onChange={event => setRegion(event.target.value)}
+            <Input value={region} disabled={busy} onChange={event => setRegion(event.target.value)}
               placeholder={category === 'Decoração' ? 'Ex.: jardim romântico' : 'Ex.: Paris, França'}
               className="mt-2 h-12 rounded-2xl" maxLength={100}/>
           </label>
-          <Button type="submit" disabled={busy} className="h-12 shrink-0 rounded-2xl px-4"
+          <Button type="submit" disabled={busy || retrySeconds > 0} className="h-12 shrink-0 rounded-2xl px-4"
             aria-label={busy ? 'Pesquisando fotos' : 'Pesquisar fotos'}>
             <Search size={19}/>
             <span className="hidden sm:inline">{busy ? 'Buscando…' : 'Pesquisar'}</span>
@@ -699,15 +717,16 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         </p>
       </div>
       <div className="min-h-0 flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-4 sm:px-6">
-        {busy && <div role="status" className="flex items-center gap-3 rounded-2xl bg-secondary/55 p-4">
+        {busy && dreamSearchMode === null && <div role="status" className="flex items-center gap-3 rounded-2xl bg-secondary/55 p-4">
           <Search size={19} className="animate-pulse text-primary"/>
           <p className="text-sm">Pesquisando publicações, tentando variações e reunindo fotos...</p>
         </div>}
         {!busy && searchError && <p role="status" className="rounded-2xl bg-secondary/55 p-4 text-sm text-muted-foreground">{searchError}</p>}
-        {!busy && dreamSearchMode === 'unavailable' && !results.length && <Button
-          variant="outline" className="min-h-12 w-full rounded-2xl" onClick={() => void runSearch()}>
-          <Search size={17}/> Tentar novamente
-        </Button>}
+        {retrySeconds > 0 && <p role="status" className="text-xs text-muted-foreground">Você poderá tentar novamente em {retrySeconds}s. O limite do serviço pode durar mais.</p>}
+        {!busy && dreamSearchMode === 'unavailable' && !results.length && <div className="space-y-2">
+          <Button disabled={retrySeconds > 0} variant="outline" className="min-h-12 w-full rounded-2xl" onClick={() => void runSearch()}><Search size={17}/> Tentar novamente</Button>
+          <Button asChild variant="ghost" className="w-full rounded-2xl"><a href={socialImageSearchUrl(category, searchedRegion)} target="_blank" rel="noopener noreferrer"><ExternalLink size={16}/> Consultar publicações fora do Duet</a></Button>
+        </div>}
         {!busy && rankedResults.length > 0 && <div className="space-y-3 rounded-2xl border border-primary/25 bg-secondary/50 p-4">
           <p className="text-sm font-semibold">{rankedResults.length} fotos prontas para o swipe.</p>
           <Button type="button" onClick={() => { setDreamSection('discover'); setSearchOpen(false); }}
