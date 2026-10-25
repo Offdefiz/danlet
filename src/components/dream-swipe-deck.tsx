@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import {
   AnimatePresence, motion, useAnimationControls, useMotionValue,
   useReducedMotion, useTransform,
@@ -88,6 +88,10 @@ function DreamSwipeFrontCard({ item, category, disabled, onDecision }: {
   const superOpacity = useTransform(y, [-145, -32], [1, 0]);
   const inFlight = useRef(false);
   const [pending, setPending] = useState(false);
+  useEffect(() => {
+    void controls.start({ scale: 1, opacity: 1, x: 0, y: 0,
+      transition: reducedMotion ? { duration: 0 } : { type: 'spring', stiffness: 330, damping: 28 } });
+  }, [controls, reducedMotion]);
 
   async function choose(action: DreamSwipeAction) {
     if (disabled || inFlight.current) return;
