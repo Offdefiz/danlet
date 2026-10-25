@@ -23,9 +23,9 @@ describe('Every Duet update announces what changed', () => {
     expect(compareReleaseVersions('2.7.0','2.6.0')).toBe(1);
     expect(compareReleaseVersions('2.6.0','2.7.0')).toBe(-1);
     expect(compareReleaseVersions('2.6.0','2.6.0')).toBe(0);
-    expect(currentVersion).toBe('2.8.4');
+    expect(currentVersion).toBe('2.8.5');
     expect(newReleaseNotesSince(null)).toEqual(releaseNotes);
-    expect(newReleaseNotesSince('2.6.0').map(note => note.version)).toEqual(['2.8.4','2.8.3','2.8.2','2.8.1','2.8.0','2.7.0']);
+    expect(newReleaseNotesSince('2.6.0').map(note => note.version)).toEqual(['2.8.5','2.8.4','2.8.3','2.8.2','2.8.1','2.8.0','2.7.0']);
     expect(newReleaseNotesSince(currentVersion)).toHaveLength(0);
   });
   it('includes ALL major post-migration additions in the first walkthrough', () => {

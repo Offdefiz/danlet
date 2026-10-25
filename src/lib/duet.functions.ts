@@ -4,6 +4,7 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { searchWeb, scrapeWebMeta as scrapeMeta, isPublicHttpsUrl } from '@/lib/firecrawl-direct.server';
+import { dreamSearchMessage } from '@/lib/dream-search-status';
 import { findAutonomousDreamPhotos } from '@/lib/dream-auto-search';
 import { isDreamSourceUrl, sourceForCategory } from '@/lib/dream-match';
 import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
@@ -24,15 +25,12 @@ export const findReferences = createServerFn({ method: 'POST' })
       search: searchWeb,
       enrich: async url => (await scrapeMeta(url)).image,
     });
-    if (found.results.length) {
-      return { results: found.results, error: null, mode: 'live' as const };
-    }
     return {
-      results: [],
-      error: found.blocked
-        ? 'A busca encontrou um bloqueio temporário. Tente novamente daqui a pouco para continuar procurando fotos públicas.'
-        : 'Não encontramos fotografias públicas acessíveis para esse lugar agora. Tente novamente com outro nome ou a região mais próxima.',
-      mode: 'unavailable' as const,
+      results: found.results,
+      error: dreamSearchMessage(found.issue, found.results.length > 0) || null,
+      mode: found.results.length ? 'live' as const : 'unavailable' as const,
+      issue: found.issue,
+      retryAfterSeconds: found.retryAfterSeconds,
     };
   });
 

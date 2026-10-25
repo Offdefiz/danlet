@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.5', date: '2026-10-25', title: 'Publicações em movimento',
+    kind: 'Melhorias',
+    highlights: [
+      'As fotos pesquisadas agora aparecem em um baralho com swipe, rotação, selos de Curtir e Passar, e animação de saída. Os efeitos respeitam a preferência por movimento reduzido.',
+      'Curtidas, recusas e Super Likes salvam a referência e o voto. Falhas ao salvar mantêm a publicação disponível para tentar novamente.',
+      'As escolhas aguardam o carregamento da foto; imagens indisponíveis podem ser recarregadas ou puladas sem registrar voto, com acesso à publicação original.',
+      'Limites de busca interrompem as tentativas automáticas, preservam fotos já encontradas e informam o tempo de espera quando disponível.',
+      'Sem resultados, o Duet distingue limite temporário de ausência de fotos e oferece uma consulta externa opcional, sem trocar a localidade pesquisada.',
+    ],
+  },
+  {
     version: '2.8.4', date: '2026-10-25', title: 'Dream Match pesquisa sozinho',
     kind: 'Melhorias',
     highlights: [
