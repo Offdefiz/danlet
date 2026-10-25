@@ -68,8 +68,6 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   const [refDescription, setRefDescription] = useState('');
   const [refTitle, setRefTitle] = useState('');
   const [manualPhoto, setManualPhoto] = useState<File | null>(null);
-  const [searchPhoto, setSearchPhoto] = useState<File | null>(null);
-  const [searchPhotoUrl, setSearchPhotoUrl] = useState('');
   const search = useServerFn(findReferences);
   const getPhoto = useServerFn(fetchPhoto);
   const importReference = useServerFn(importDreamReference);
@@ -192,22 +190,41 @@ export function DuetOrganizer({ userId }: { userId: string }) {
     if (error) throw new Error('Falha ao enviar foto: ' + error.message);
     return path;
   }
-  async function include(item: SearchItem) {
+  /** Choosing a social photograph automatically saves the original post and
+   * the person's vote in one interaction. No URL copy, upload or extra step. */
+  async function chooseDiscovered(item: SearchItem, superLike: boolean) {
+    if (!item.image) return;
     setBusy(true);
     try {
-      const attached = searchPhotoUrl === item.source_url && searchPhoto
-        ? await uploadDreamPhoto(searchPhoto) : null;
-      const added = await importReference({ data: {
-        source_url: item.source_url, category, title: item.title.slice(0,160),
-        notes: item.description, uploaded_path: attached,
-        preview_url: attached ? null : item.image || null,
-      } });
-      toast.success(`${added.title} entrou no Dream Match com imagem! ♡`);
-      setResults(list => list.filter(ref => ref.source_url !== item.source_url));
-      setSearchPhoto(null); setSearchPhotoUrl('');
+      const existing = data.references.find(ref =>
+        ref.source_url === item.source_url && ref.category === category);
+      const saved = existing && hasDreamPhoto(existing)
+        ? { id: existing.id, title: existing.title }
+        : await importReference({ data: {
+          source_url: item.source_url, category, title: item.title.slice(0, 160),
+          notes: item.description, uploaded_path: null, preview_url: item.image,
+        } });
+      const { error } = await supabase.from('votes').upsert({
+        reference_id: saved.id, user_id: userId, liked: true,
+        super_liked: superLike, updated_at: new Date().toISOString(),
+      });
+      if (error) throw new Error(error.message);
+      setResults(previous => previous.filter(result => result.source_url !== item.source_url));
+      setLocallyVoted(previous => new Set(previous).add(saved.id));
       await cache.invalidateQueries({ queryKey: ['duet', userId] });
-    } catch (err) { toast.error(err instanceof Error ? err.message : 'Não foi possível incluir.'); }
-    finally { setBusy(false); }
+      if (partnerVote(data.votes, saved.id, userId)?.liked) {
+        playDuetSound('match', userId);
+        toast.success('É MATCH! Os dois curtiram ' + saved.title + ' ♡');
+      } else if (superLike) {
+        playDuetSound('success', userId);
+        toast.success(saved.title + ' foi para seus Super Likes! ⭐');
+      } else {
+        playDuetSound('success', userId);
+        toast.success(saved.title + ' foi curtido! ♡');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Não consegui registrar essa escolha.');
+    } finally { setBusy(false); }
   }
   async function saveReference(e: React.FormEvent) {
     e.preventDefault();
