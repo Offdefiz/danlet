@@ -34,8 +34,8 @@ describe('Dream Match arbitrary-region search', () => {
   it('explains the provider limitation instead of displaying a technical API error', () => {
     const organizer = readFileSync('src/components/duet-organizer.tsx','utf8');
     expect(organizer).toContain('Onde quer descobrir lugares?');
-    expect(organizer).toContain('chooseDiscovered(item, false)');
-    expect(organizer).toContain('chooseDiscovered(item, true)');
+    expect(organizer).toContain('<DreamSwipeDeck');
+    expect(organizer).toContain('chooseDiscovered(item, action)');
     expect(organizer).not.toContain('Adicionar publicação encontrada');
     expect(organizer).not.toContain('FIRECRAWL_API_KEY');
   });
