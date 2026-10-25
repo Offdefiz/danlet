@@ -12,14 +12,26 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
-    version: '2.8.5', date: '2026-10-25', title: 'Publicações em movimento',
-    kind: 'Melhorias',
+    version: '2.8.6', date: '2026-10-25', title: 'Fotos disponíveis e busca mais confiável',
+    kind: 'Correções',
     highlights: [
-      'As fotos pesquisadas agora aparecem em um baralho com swipe, rotação, selos de Curtir e Passar, e animação de saída. Os efeitos respeitam a preferência por movimento reduzido.',
-      'Curtidas, recusas e Super Likes salvam a referência e o voto. Falhas ao salvar mantêm a publicação disponível para tentar novamente.',
-      'As escolhas aguardam o carregamento da foto; imagens indisponíveis podem ser recarregadas ou puladas sem registrar voto, com acesso à publicação original.',
+      'O swipe só libera votos depois que a fotografia carrega, inclusive quando ela já está no cache do navegador.',
+      'Fotos indisponíveis podem ser recarregadas ou puladas sem voto, com aviso e acesso à publicação original.',
       'Limites de busca interrompem as tentativas automáticas, preservam fotos já encontradas e informam o tempo de espera quando disponível.',
-      'Sem resultados, o Duet distingue limite temporário de ausência de fotos e oferece uma consulta externa opcional, sem trocar a localidade pesquisada.',
+      'A pesquisa distingue ausência de fotos de falhas do serviço e oferece uma consulta externa opcional, mantendo a localidade escolhida.',
+      'O baralho e a celebração de Match da versão anterior foram preservados, com proteção adicional contra escolhas duplicadas.',
+    ],
+  },
+  {
+    version: '2.8.5', date: '2026-10-25', title: 'Swipe de verdade, fotos e efeitos',
+    kind: 'Novidades',
+    highlights: [
+      'Fotos encontradas na busca agora entram diretamente num baralho de swipe dentro de Descobrir, em vez de aparecerem numa lista.',
+      'Arraste para a esquerda para passar, para a direita para curtir ou para cima para dar Super Like, com giro e efeito visual de decisão.',
+      'Cartões de fotos em camadas, com brilho de vidro, botões flutuantes e animações suaves no iPhone.',
+      'Passar, curtir e Super Like salvam o voto correspondente no Supabase automaticamente, sem cadastro manual de links ou imagens.',
+      'Se uma gravação falhar, o card volta ao lugar para você tentar novamente sem perder a decisão.',
+      'Quando os dois curtem a mesma publicação, aparece uma celebração de Match com atalho para os Matches do casal.',
     ],
   },
   {
