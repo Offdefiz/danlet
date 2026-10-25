@@ -375,15 +375,15 @@ export function DuetOrganizer({ userId }: { userId: string }) {
           setCategory(item); setState(''); setCity(''); setScenery('');
           if (item !== category) { setResults([]); setDreamSearchMode(null); setSearchError(''); }
         }}>{item}</Button>)}</div>
-      <div className="grid grid-cols-3 gap-2">
+      {rankedResults.length === 0 && <div className="grid grid-cols-3 gap-2">
         <Select label="Estado" value={state} onChange={value => { setState(value); setCity(''); }}
           options={[...new Set(data.references.filter(r => r.category === category).map(r => r.state).filter(Boolean))]}/>
         <Select label="Cidade" value={city} onChange={setCity}
           options={[...new Set(data.references.filter(r => r.category === category && (!state || r.state === state)).map(r => r.city).filter(Boolean))]}/>
         <Select label="Cenário" value={scenery} onChange={setScenery}
           options={[...new Set(refs.map(r => r.scenery).filter(Boolean))]}/>
-      </div>
-      <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
+      </div>}
+      {rankedResults.length === 0 && <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-border bg-card p-3">
         <span className="text-xs leading-relaxed text-muted-foreground">
           {category === 'Decoração' ? 'Decoração: fotos e Pins do Pinterest' : 'Locais: publicações e perfis do Instagram'}.
           Apenas referências com fotografia entram nas escolhas.
@@ -391,7 +391,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <Button variant="outline" size="sm" className="shrink-0 rounded-full" onClick={() => setSearchOpen(true)}>
           <Search size={16}/> Buscar fotos
         </Button>
-      </div>
+      </div>}
       {dreamSection === 'discover' && <section aria-label="Descobrir lugares e decorações com fotos" className="space-y-4">
         {rankedResults.length > 0 ? <>
           <div className="flex flex-wrap items-center justify-between gap-2 rounded-2xl border border-primary/25 bg-primary/10 px-4 py-3">
@@ -645,6 +645,14 @@ export function DuetOrganizer({ userId }: { userId: string }) {
         <Star size={24} fill="currentColor" className="absolute -right-4 -top-2 text-amber-200"/>
         <Star size={18} fill="currentColor" className="absolute -bottom-2 -left-4 text-amber-200"/>
       </motion.div>
+      {matchCelebration?.image && <div className="relative h-40 w-full overflow-hidden rounded-2xl border border-primary/25">
+        <img src={matchCelebration.image} alt={'Foto do nosso Match: ' + matchCelebration.title}
+          className="h-full w-full object-cover" loading="eager"
+          onError={event => { event.currentTarget.style.display = 'none'; }}/>
+        <span className="absolute bottom-2 left-2 rounded-full border border-white/20 bg-black/60 px-3 py-1 text-xs font-semibold text-white backdrop-blur-lg">
+          Uma escolha dos dois ♡
+        </span>
+      </div>}
       <DialogHeader className="text-center">
         <DialogTitle className="text-center text-3xl font-black tracking-tight text-primary">É MATCH! ♡</DialogTitle>
         <p className="mt-2 text-sm leading-relaxed text-muted-foreground">
