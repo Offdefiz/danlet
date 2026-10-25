@@ -45,9 +45,10 @@ describe('keyless Instagram/Pinterest Dream Match photographs', () => {
     expect(media).toContain('DreamSearchPhoto');
     expect(media).toContain('onError={() => setFailed(true)}');
     expect(media).toContain('<DreamPlatformPreview sourceUrl={sourceUrl} category={category}/>');
-    expect(source).toContain('curatedDreamResults(data.category, region)');
+    expect(source).toContain('findAutonomousDreamPhotos');
     expect(source).toContain('preview_url');
     expect(source).toContain('safeSocialPreviewUrl');
+    expect(source).not.toContain('curatedDreamResults(data.category, region)');
     expect(source).not.toContain('getCuratedWeddingVenues');
   });
 });

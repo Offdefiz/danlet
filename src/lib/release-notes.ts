@@ -12,6 +12,17 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.4', date: '2026-10-25', title: 'Dream Match pesquisa sozinho',
+    kind: 'Melhorias',
+    highlights: [
+      'Digite qualquer cidade, bairro, destino ou região: o Dream Match faz várias buscas automáticas mantendo exatamente o local escolhido.',
+      'Resultados com fotografias públicas do Instagram para locais e do Pinterest para decorações aparecem diretamente no aplicativo, sem catálogos fixos de outras regiões.',
+      'Se a primeira pesquisa não encontrar fotos, o sistema amplia os termos e procura novas publicações automaticamente, removendo repetições.',
+      'Toque em Curtir ou Super Like para salvar a inspiração, sua foto original e o voto de uma vez só, sem copiar links ou enviar arquivos.',
+      'Busca e decisão não dependem de cadastro manual; quando não existir mídia pública acessível, o Duet informa a indisponibilidade sem inventar lugares ou fotos.',
+    ],
+  },
+  {
     version: '2.8.3', date: '2026-10-24', title: 'Qualquer lugar, novas descobertas',
     kind: 'Melhorias',
     highlights: [

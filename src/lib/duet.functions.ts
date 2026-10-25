@@ -4,8 +4,9 @@ import type { SupabaseClient } from '@supabase/supabase-js';
 import type { Database } from '@/integrations/supabase/types';
 import { requireSupabaseAuth } from '@/integrations/supabase/auth-middleware';
 import { searchWeb, scrapeWebMeta as scrapeMeta, isPublicHttpsUrl } from '@/lib/firecrawl-direct.server';
+import { findAutonomousDreamPhotos } from '@/lib/dream-auto-search';
 import { isDreamSourceUrl, sourceForCategory } from '@/lib/dream-match';
-import { curatedDreamResults, safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
+import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 
 export const findReferences = createServerFn({ method: 'POST' })
   .middleware([requireSupabaseAuth])
@@ -15,46 +16,23 @@ export const findReferences = createServerFn({ method: 'POST' })
       .select('person').eq('user_id', context.userId).maybeSingle();
     if (!member) throw new Error('Acesso reservado ao casal.');
     const source = sourceForCategory(data.category);
-    const region = data.region.trim() || (source === 'instagram' ? 'Minas Gerais casamento' : 'decoração casamento romântico');
-    const query = source === 'instagram'
-      ? `espaço casamento local eventos ${region} site:instagram.com`
-      : `decoração casamento ${region} site:pinterest.com/pin/`;
-    try {
-      const found = await searchWeb(query, 10);
-      const sites = found.filter(hit => isDreamSourceUrl(hit.url, data.category)).slice(0, 10);
-      // Keyless queries are capped per IP. Search already supplies image
-      // thumbnails, so use at most one optional social-page scrape, rather
-      // than a burst of 12 scrape calls that would exhaust the free limit.
-      let metaBudget = process.env['FIRECRAWL_API_KEY'] ? 3 : 1;
-      const results = [];
-      for (const item of sites) {
-        let image = safeSocialPreviewUrl(item.image, data.category) ? item.image! : '';
-        const path = new URL(item.url).pathname;
-        if (!image && source === 'instagram' && metaBudget > 0 &&
-          /^\/(p|reel|tv)\//.test(path)) {
-          metaBudget--;
-          try {
-            const meta = await scrapeMeta(item.url);
-            if (safeSocialPreviewUrl(meta.image, data.category)) image = meta.image;
-          } catch { /* public post may still embed normally */ }
-        }
-        results.push({ title: item.title, source_url: item.url,
-          description: item.description ?? '', image });
-      }
-      // Profiles without a preview and non-embeddable links cannot be shown
-      // as image cards. Prefer posts/Reels whose media can be embedded.
-      const photoResults = results.filter(item => item.image
-        || /^\/(?:p|reel|tv)\//.test(new URL(item.source_url).pathname)
-        || source === 'pinterest');
-      if (photoResults.length) return { results: photoResults, error: null, mode: 'live' as const };
-    } catch { /* public curated references remain available offline */ }
-    const curated = curatedDreamResults(data.category, region);
+    const region = data.region.trim() ||
+      (source === 'instagram' ? 'Minas Gerais' : 'decoração casamento');
+    const found = await findAutonomousDreamPhotos({
+      category: data.category,
+      place: region,
+      search: searchWeb,
+      enrich: async url => (await scrapeMeta(url)).image,
+    });
+    if (found.results.length) {
+      return { results: found.results, error: null, mode: 'live' as const };
+    }
     return {
-      results: curated,
-      error: curated.length
-        ? 'Referências públicas selecionadas para essa região. As imagens são carregadas do Instagram ou Pinterest.'
-        : 'Ainda não há referências para essa pesquisa. Experimente outro termo ou adicione uma publicação.',
-      mode: curated.length ? 'curated' as const : 'unavailable' as const,
+      results: [],
+      error: found.blocked
+        ? 'A busca encontrou um bloqueio temporário. Tente novamente daqui a pouco para continuar procurando fotos públicas.'
+        : 'Não encontramos fotografias públicas acessíveis para esse lugar agora. Tente novamente com outro nome ou a região mais próxima.',
+      mode: 'unavailable' as const,
     };
   });
 
@@ -132,7 +110,21 @@ export const importDreamReference = createServerFn({ method: 'POST' })
         ? 'O Pinterest não liberou uma imagem por integração. Anexe uma foto autorizada para usar esse Pin no Dream Match.'
         : 'O Instagram não liberou uma foto estável. Anexe uma foto autorizada antes de salvar essa opção.',
     );
-    const { error } = await context.supabase.from('references_catalog').insert({
+    const { data: prior, error: priorError } = await context.supabase
+      .from('references_catalog').select('id,image_path,image_url')
+      .eq('source_url', data.source_url).eq('category', data.category).limit(1).maybeSingle();
+    if (priorError) throw new Error('Não consegui consultar a referência existente.');
+    if (prior) {
+      if (!prior.image_path && !prior.image_url && (image_path || image_url)) {
+        const { error: updateError } = await context.supabase
+          .from('references_catalog').update({ image_path, image_url,
+            image_credit: credit }).eq('id', prior.id);
+        if (updateError) throw new Error('Não consegui anexar a foto automaticamente à referência existente.');
+      }
+      return { id: prior.id, title: data.title, image_path: prior.image_path ?? image_path,
+        image_url: prior.image_url ?? image_url };
+    }
+    const { data: inserted, error } = await context.supabase.from('references_catalog').insert({
       title: data.title.trim(),
       description: data.notes.trim(),
       source_url: data.source_url,
@@ -143,9 +135,9 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       image_path,
       image_url,
       image_credit: credit,
-    });
-    if (error) throw new Error('Não foi possível salvar essa referência com fotografia: ' + error.message);
-    return { title: data.title, image_path, image_url };
+    }).select('id').single();
+    if (error || !inserted) throw new Error('Não foi possível salvar essa referência com fotografia: ' + (error?.message ?? 'sem confirmação'));
+    return { id: inserted.id, title: data.title, image_path, image_url };
   });
 
 export const fetchPhoto = createServerFn({ method: 'POST' })
