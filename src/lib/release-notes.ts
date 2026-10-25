@@ -12,6 +12,16 @@ export type ReleaseNote = {
 };
 export const releaseNotes: readonly ReleaseNote[] = [
   {
+    version: '2.8.7', date: '2026-10-25', title: 'Publicação visível, escolha liberada',
+    kind: 'Correções',
+    highlights: [
+      'Quando a miniatura falha, o Dream Match também aceita a prévia oficial carregada do Instagram ou Pinterest para liberar os botões de escolha.',
+      'A publicação original deixa de receber o aviso incorreto de foto indisponível e a sobreposição de título que cobria o post.',
+      'Publicações incorporadas preservam sua rolagem e seu carrossel; use os botões de Passar, Curtir ou Super Like para decidir.',
+      'Se o post também não carregar, as escolhas continuam bloqueadas e é possível abrir a origem ou pular sem votar.',
+    ],
+  },
+  {
     version: '2.8.6', date: '2026-10-25', title: 'Fotos disponíveis e busca mais confiável',
     kind: 'Correções',
     highlights: [

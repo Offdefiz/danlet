@@ -44,7 +44,7 @@ describe('Automated new-version notifications', () => {
     expect(db.pushTo).toHaveBeenCalledTimes(2);
     expect(db.pushTo).toHaveBeenCalledWith(
       ['daniel-id'], expect.stringContaining('Duet'),
-      expect.stringContaining('fotografia'), 'duet-update-' + currentVersion,
+      expect.stringContaining('prévia oficial'), 'duet-update-' + currentVersion,
       '/?duet_view=updates', 'high',
     );
     expect(db.pushTo).toHaveBeenCalledWith(

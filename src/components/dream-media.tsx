@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Camera, ExternalLink } from 'lucide-react';
 import type { Row } from '@/lib/duet.types';
 import { cachedAvatarUrl } from '@/lib/avatar-images';
-import { pinId, sourceForCategory, hasDreamPhoto } from '@/lib/dream-match';
+import { pinId, sourceForCategory, hasDreamPhoto, isDreamSourceUrl } from '@/lib/dream-match';
 import { safeSocialPreviewUrl } from '@/lib/dream-discovery-index';
 
 /** Only official public Instagram/Pinterest embeds are used as source previews.
@@ -33,24 +33,68 @@ function loadOfficialWidget(src: string): Promise<void> {
   });
 }
 
-export function DreamPlatformPreview({ sourceUrl, category }: { sourceUrl: string; category: string }) {
+export function DreamPlatformPreview({ sourceUrl, category, onStatusChange }: {
+  sourceUrl: string; category: string;
+  onStatusChange?: (status: 'loading' | 'ready' | 'unavailable') => void;
+}) {
   const ref = useRef<HTMLDivElement>(null);
   const isPin = sourceForCategory(category) === 'pinterest' && Boolean(pinId(sourceUrl));
   const isInstagramPost = sourceForCategory(category) === 'instagram'
+    && isDreamSourceUrl(sourceUrl, category)
     && /^\/(p|reel|tv)\//.test(new URL(sourceUrl).pathname);
 
   useEffect(() => {
     let alive = true;
-    if (!isPin && !isInstagramPost) return;
+    let ready = false;
+    const root = ref.current;
+    const cleanups: Array<() => void> = [];
+    if ((!isPin && !isInstagramPost) || !root) { onStatusChange?.('unavailable'); return; }
+    onStatusChange?.('loading');
+    const notifyReady = () => {
+      if (alive && !ready) { ready = true; onStatusChange?.('ready'); }
+    };
+    const observed = new WeakSet<Element>();
+    const inspect = () => {
+      // A widget script loading is not a rendered publication. Observe only
+      // official publisher frames and Pinterest media generated inside this preview.
+      for (const frame of root.querySelectorAll('iframe')) {
+        let trusted = false;
+        try {
+          const url = new URL(frame.src);
+          trusted = url.protocol === 'https:' && !url.username && !url.password && (isPin
+            ? (url.hostname === 'pinterest.com' || url.hostname.endsWith('.pinterest.com'))
+            : ['www.instagram.com', 'instagram.com'].includes(url.hostname) && /\/embed(?:\/|$)/.test(url.pathname));
+        } catch { /* ignore unrecognized frames */ }
+        if (!trusted || observed.has(frame)) continue;
+        observed.add(frame);
+        const loaded = () => { frame.dataset['duetLoaded'] = 'yes'; notifyReady(); };
+        frame.addEventListener('load', loaded);
+        cleanups.push(() => frame.removeEventListener('load', loaded));
+        if (frame.dataset['duetLoaded'] === 'yes') notifyReady();
+      }
+      if (isPin) for (const image of root.querySelectorAll('img')) {
+        if (!safeSocialPreviewUrl(image.src, category) || observed.has(image)) continue;
+        observed.add(image);
+        const loaded = () => { if (image.naturalWidth > 0) notifyReady(); };
+        image.addEventListener('load', loaded);
+        cleanups.push(() => image.removeEventListener('load', loaded));
+        if (image.complete) loaded();
+      }
+    };
+    const observer = new MutationObserver(inspect);
+    observer.observe(root, { childList: true, subtree: true, attributes: true, attributeFilter: ['src'] });
+    inspect();
+    const timer = window.setTimeout(() => { if (alive && !ready) onStatusChange?.('unavailable'); }, 12000);
     const src = isPin ? 'https://assets.pinterest.com/js/pinit.js' : 'https://www.instagram.com/embed.js';
     void loadOfficialWidget(src).then(() => {
       if (!alive || !ref.current) return;
       const widget = window as SocialWidgetWindow;
       if (isPin) widget.PinUtils?.build();
       else widget.instgrm?.Embeds.process();
+      inspect();
     });
-    return () => { alive = false; };
-  }, [sourceUrl, isPin, isInstagramPost]);
+    return () => { alive = false; observer.disconnect(); window.clearTimeout(timer); cleanups.forEach(cleanup => cleanup()); };
+  }, [sourceUrl, category, isPin, isInstagramPost, onStatusChange]);
 
   if (!isPin && !isInstagramPost) return <p className="text-xs text-muted-foreground">O Instagram não disponibiliza um embed de perfil. Confira a foto original antes de incluir.</p>;
   return <div ref={ref} className="dream-social-embed relative mx-auto w-full overflow-hidden rounded-2xl bg-card p-2">
