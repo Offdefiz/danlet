@@ -16,7 +16,7 @@ import { findReferences, fetchPhoto, importDreamReference } from '@/lib/duet.fun
 import { dreamCollections, hasDreamPhoto, isDreamSourceUrl, sourceForCategory, type DreamSection } from '@/lib/dream-match';
 import { DreamSearchPhoto, DreamReferencePhoto } from '@/components/dream-media';
 import { optimizeDreamPhoto } from '@/lib/dream-photo';
-import { socialImageSearchUrl, socialSearchSource, shouldOfferExternalDreamSearch } from '@/lib/dream-anywhere';
+
 import { Avatar, Chat, PushButton, Tutorial } from '@/components/duet-extras';
 import { ThemePicker, readPersonalTheme, themes } from '@/components/duet-theme';
 import { DuetUpdatesDialog, DuetUpdatesPreview, openDuetUpdates } from '@/components/duet-updates';
@@ -178,7 +178,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
       setSearchError(found.error ?? (found.results.length ? '' : 'Nenhuma foto pública encontrada para essa pesquisa.'));
     } catch {
       setDreamSearchMode('unavailable');
-      setSearchError('A pesquisa interna não está disponível agora. Você pode procurar fotos da região e adicioná-las ao Dream Match.');
+      setSearchError('A pesquisa não pôde ser concluída agora. Tente novamente daqui a pouco.');
     } finally { setBusy(false); }
   }
   async function uploadDreamPhoto(file: File): Promise<string> {
