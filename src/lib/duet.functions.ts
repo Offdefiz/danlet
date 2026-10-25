@@ -110,7 +110,21 @@ export const importDreamReference = createServerFn({ method: 'POST' })
         ? 'O Pinterest não liberou uma imagem por integração. Anexe uma foto autorizada para usar esse Pin no Dream Match.'
         : 'O Instagram não liberou uma foto estável. Anexe uma foto autorizada antes de salvar essa opção.',
     );
-    const { error } = await context.supabase.from('references_catalog').insert({
+    const { data: prior, error: priorError } = await context.supabase
+      .from('references_catalog').select('id,image_path,image_url')
+      .eq('source_url', data.source_url).eq('category', data.category).limit(1).maybeSingle();
+    if (priorError) throw new Error('Não consegui consultar a referência existente.');
+    if (prior) {
+      if (!prior.image_path && !prior.image_url && (image_path || image_url)) {
+        const { error: updateError } = await context.supabase
+          .from('references_catalog').update({ image_path, image_url,
+            image_credit: credit }).eq('id', prior.id);
+        if (updateError) throw new Error('Não consegui anexar a foto automaticamente à referência existente.');
+      }
+      return { id: prior.id, title: data.title, image_path: prior.image_path ?? image_path,
+        image_url: prior.image_url ?? image_url };
+    }
+    const { data: inserted, error } = await context.supabase.from('references_catalog').insert({
       title: data.title.trim(),
       description: data.notes.trim(),
       source_url: data.source_url,
@@ -121,9 +135,9 @@ export const importDreamReference = createServerFn({ method: 'POST' })
       image_path,
       image_url,
       image_credit: credit,
-    });
-    if (error) throw new Error('Não foi possível salvar essa referência com fotografia: ' + error.message);
-    return { title: data.title, image_path, image_url };
+    }).select('id').single();
+    if (error || !inserted) throw new Error('Não foi possível salvar essa referência com fotografia: ' + (error?.message ?? 'sem confirmação'));
+    return { id: inserted.id, title: data.title, image_path, image_url };
   });
 
 export const fetchPhoto = createServerFn({ method: 'POST' })
