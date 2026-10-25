@@ -193,7 +193,7 @@ export function DuetOrganizer({ userId }: { userId: string }) {
   /** Choosing a social photograph automatically saves the original post and
    * the person's vote in one interaction. No URL copy, upload or extra step. */
   async function chooseDiscovered(item: SearchItem, superLike: boolean) {
-    if (!item.image) return;
+    if (!item.image || !data) return;
     setBusy(true);
     try {
       const existing = data.references.find(ref =>
