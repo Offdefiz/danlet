@@ -1,3 +1,0 @@
-CREATE POLICY duet_photos_read ON storage.objects FOR SELECT TO authenticated USING(bucket_id = 'duet-photos' AND public.is_duet_member());
-CREATE POLICY duet_photos_add ON storage.objects FOR INSERT TO authenticated WITH CHECK(bucket_id = 'duet-photos' AND public.is_duet_member() AND (storage.foldername(name))[1] = auth.uid()::text);
-CREATE POLICY duet_photos_delete ON storage.objects FOR DELETE TO authenticated USING(bucket_id = 'duet-photos' AND public.is_duet_member() AND owner_id = auth.uid()::text);
