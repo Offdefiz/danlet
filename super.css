@@ -1,0 +1,25 @@
+
+/* Super App | visual system extensions */
+.future-spotlight{padding:35px;background:radial-gradient(circle at 85% 5%,#f6b6d72d,transparent 48%),linear-gradient(125deg,#593754,#332c56);margin:26px 0}
+.future-spotlight h2{max-width:650px;margin:16px 0;font-size:clamp(29px,5vw,48px)}
+.future-spotlight p{max-width:520px;color:#e7d7ed}
+.super-grid,.chapter-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:17px}
+.super-stat{min-height:162px;display:flex;flex-direction:column;justify-content:center}
+.super-value{font:600 clamp(21px,3vw,35px)/1.2 Georgia,serif;display:block;margin:18px 0 9px;color:#f6d8f1;overflow-wrap:anywhere}
+.chapter-grid{grid-template-columns:repeat(4,minmax(0,1fr))}
+.chapter-card{display:flex;flex-direction:column;gap:11px;min-height:260px}
+.chapter-card h3{font-size:24px;margin-top:10px}
+.chapter-card p{font-size:13px;color:#c6b8d0;flex:1}
+.chapter-card .space-top{margin-top:12px}
+.decision-card h3{font-size:24px}
+.choice-row{display:flex;align-items:center;gap:8px;margin-top:19px}
+.choice-row>span:not(.muted){background:#e5c4f118;border:1px solid #e5c4f133;padding:9px 12px;border-radius:13px;flex:1;text-align:center;overflow-wrap:anywhere}
+.vote-row{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:18px}
+.vote-row>div{border:1px solid #ffffff1c;background:#ffffff07;border-radius:14px;padding:12px}
+.vote-row strong{font-size:12px;overflow-wrap:anywhere}
+.vote-row .space-top{margin-top:10px}
+.vote-row [aria-pressed="true"]{background:#e2b7ed;color:#25182e;border-color:#e2b7ed}
+.row-actions .tiny-btn{min-height:34px}
+.super-stat .soft-note{overflow-wrap:anywhere}
+@media(max-width:900px){.chapter-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:650px){.super-grid{grid-template-columns:1fr}.chapter-grid{grid-template-columns:1fr 1fr;gap:11px}.chapter-card{padding:17px;min-height:245px}.chapter-card h3{font-size:20px}.chapter-card .button{padding:10px;min-height:39px}.future-spotlight{padding:24px}.super-stat{min-height:120px}.super-value{margin:12px 0 6px;font-size:28px}.choice-row{font-size:12px}.vote-row{grid-template-columns:1fr}}
